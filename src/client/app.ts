@@ -1,5 +1,7 @@
 import { describeWeatherCode, windDirectionLabel, conditionTip, type Category } from "./weatherCodes.js";
 import { weatherIcon, windBadgeSvg } from "./icons.js";
+import { cityIconSvg } from "./cityIcons.js";
+import { CITIES } from "../shared/cities.js";
 
 interface CurrentWeather {
   temperature: number;
@@ -53,9 +55,23 @@ interface ApiErrorBody {
   message: string;
 }
 
+interface CityExtreme {
+  name: string;
+  temperature: number;
+  weatherCode: number;
+}
+
+interface HighlightsResponse {
+  hottest: CityExtreme | null;
+  coldest: CityExtreme | null;
+  updatedAt: string;
+}
+
 const DEBOUNCE_MS = 300;
 const DEFAULT_CITY = "تبریز";
 const WINDY_THRESHOLD_KMH = 35;
+const OUTLOOK_DAY_OFFSET = 4; // "~4 days from now"
+const OUTLOOK_MIN_PROBABILITY = 10;
 
 const els = {
   form: document.getElementById("search-form") as HTMLFormElement,
@@ -63,6 +79,7 @@ const els = {
   status: document.getElementById("search-status") as HTMLParagraphElement,
 
   quickCities: document.getElementById("quick-cities") as HTMLElement,
+  quickCitiesToggle: document.getElementById("quick-cities-toggle") as HTMLButtonElement,
 
   stateLoading: document.getElementById("state-loading") as HTMLElement,
   stateError: document.getElementById("state-error") as HTMLElement,
@@ -77,6 +94,8 @@ const els = {
   heroFeelsLike: document.getElementById("hero-feels-like") as HTMLElement,
   heroUpdated: document.getElementById("hero-updated") as HTMLElement,
   heroTip: document.getElementById("hero-tip") as HTMLElement,
+  heroOutlookIcon: document.getElementById("hero-outlook-icon") as HTMLElement,
+  heroOutlookText: document.getElementById("hero-outlook-text") as HTMLElement,
 
   detailHumidity: document.getElementById("detail-humidity") as HTMLElement,
   detailWind: document.getElementById("detail-wind") as HTMLElement,
@@ -92,19 +111,16 @@ const els = {
   scrollRight: document.getElementById("hourly-scroll-right") as HTMLButtonElement,
 
   dailyList: document.getElementById("daily-list") as HTMLUListElement,
+
+  extremeHotCity: document.getElementById("extreme-hot-city") as HTMLElement,
+  extremeHotTemp: document.getElementById("extreme-hot-temp") as HTMLElement,
+  extremeColdCity: document.getElementById("extreme-cold-city") as HTMLElement,
+  extremeColdTemp: document.getElementById("extreme-cold-temp") as HTMLElement,
 };
 
 let debounceTimer: number | undefined;
 
 const HERO_CATEGORY_CLASSES = ["hero--sunny", "hero--cloudy", "hero--fog", "hero--rain", "hero--snow", "hero--storm"];
-const ROW_CATEGORY_CLASSES = [
-  "daily-row--sunny",
-  "daily-row--cloudy",
-  "daily-row--fog",
-  "daily-row--rain",
-  "daily-row--snow",
-  "daily-row--storm",
-];
 
 function showState(state: "loading" | "error" | "content"): void {
   els.stateLoading.classList.toggle("state-panel--hidden", state !== "loading");
@@ -125,6 +141,31 @@ function formatWeekday(isoDate: string): string {
 function setHeroCategory(category: Category): void {
   els.hero.classList.remove(...HERO_CATEGORY_CLASSES);
   els.hero.classList.add(`hero--${category}`);
+}
+
+/** Plain-language "will it rain/snow in ~4 days" line, for people who don't want to scan the whole week. */
+function renderOutlook(daily: DailyEntry[]): void {
+  const entry = daily[OUTLOOK_DAY_OFFSET];
+  if (!entry) {
+    els.heroOutlookText.textContent = "";
+    return;
+  }
+
+  const info = describeWeatherCode(entry.weatherCode);
+  const weekday = formatWeekday(entry.date);
+  const prob = entry.precipitationProbability;
+
+  if (prob < OUTLOOK_MIN_PROBABILITY) {
+    els.heroOutlookIcon.innerHTML = weatherIcon("clear");
+    els.heroOutlookText.textContent = `در ${weekday} (۴ روز دیگر) بارشی پیش‌بینی نمی‌شود.`;
+    return;
+  }
+
+  const precipWord =
+    info.category === "snow" ? "برف" : info.category === "rain" || info.category === "storm" ? "باران" : "بارش";
+
+  els.heroOutlookIcon.innerHTML = weatherIcon(info.icon);
+  els.heroOutlookText.textContent = `احتمال ${precipWord} در ${weekday} (۴ روز دیگر): ${prob}٪`;
 }
 
 function renderHero(data: WeatherResponse): void {
@@ -148,6 +189,8 @@ function renderHero(data: WeatherResponse): void {
     uvIndex: current.uvIndex,
     windSpeed: current.windSpeed,
   });
+
+  renderOutlook(data.daily);
 }
 
 function renderDetails(data: WeatherResponse): void {
@@ -254,6 +297,41 @@ async function fetchWeather(city: string): Promise<void> {
   }
 }
 
+function renderQuickCities(): void {
+  els.quickCities.innerHTML = "";
+  for (const city of CITIES) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "city-card";
+    button.dataset.city = city.name;
+    button.setAttribute("aria-pressed", String(city.name === DEFAULT_CITY));
+    button.innerHTML = `
+      <span class="city-card__icon">${cityIconSvg(city.icon)}</span>
+      <span class="city-card__name">${city.name}</span>
+    `;
+    els.quickCities.appendChild(button);
+  }
+}
+
+async function loadHighlights(): Promise<void> {
+  try {
+    const response = await fetch("/api/highlights");
+    if (!response.ok) return;
+    const data = (await response.json()) as HighlightsResponse;
+
+    if (data.hottest) {
+      els.extremeHotCity.textContent = data.hottest.name;
+      els.extremeHotTemp.textContent = `${Math.round(data.hottest.temperature)}°`;
+    }
+    if (data.coldest) {
+      els.extremeColdCity.textContent = data.coldest.name;
+      els.extremeColdTemp.textContent = `${Math.round(data.coldest.temperature)}°`;
+    }
+  } catch {
+    // Non-critical section; fail silently and leave the placeholders.
+  }
+}
+
 function handleInputDebounced(): void {
   window.clearTimeout(debounceTimer);
   const value = els.input.value.trim();
@@ -292,6 +370,14 @@ els.quickCities.addEventListener("click", (event) => {
   fetchWeather(target.dataset.city);
 });
 
+els.quickCitiesToggle.addEventListener("click", () => {
+  const collapsed = els.quickCities.classList.toggle("quick-cities__grid--collapsed");
+  els.quickCitiesToggle.setAttribute("aria-expanded", String(!collapsed));
+  els.quickCitiesToggle.textContent = collapsed ? "نمایش همه شهرها" : "نمایش کمتر";
+});
+
 // Load a sensible default so the page never opens empty.
+renderQuickCities();
 els.input.value = DEFAULT_CITY;
 fetchWeather(DEFAULT_CITY);
+loadHighlights();

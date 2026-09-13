@@ -2,6 +2,7 @@ import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import weatherRouter from "./routes/weather.js";
+import highlightsRouter from "./routes/highlights.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,6 +16,7 @@ const port = Number(process.env.PORT ?? 3000);
 
 app.use(express.static(publicDir));
 app.use("/api", weatherRouter);
+app.use("/api", highlightsRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });

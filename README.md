@@ -7,9 +7,12 @@ and a 7-day forecast — all labeled in Persian, laid out right-to-left.
 ## What's new in this pass
 
 - **Never opens empty**: loads تبریز (Tabriz) automatically on page load.
-- **Quick-select city cards**: a row of square, tappable cards for major
-  Iranian cities (تهران، مشهد، اصفهان، شیراز، تبریز، اهواز، کرج، قم) sits above
-  the results — tap one instead of typing.
+- **31 quick-select city cards**: every Iranian provincial capital
+  (`src/shared/cities.ts`) is a tappable square card, rendered dynamically —
+  collapsed to the first 10 by default with a "نمایش همه شهرها" toggle to
+  expand, so the panel doesn't overwhelm the page. Icons are custom SVG pins
+  (not emoji) themed by city type: capital, landmark, mountain, coastal, or
+  desert.
 - **Animated, condition-aware icons**: every icon (hero, hourly, daily) is a
   small animated SVG — rays pulse on sunny days, clouds drift, raindrops and
   snowflakes fall, storm bolts flash, fog lines fade in and out.
@@ -17,15 +20,25 @@ and a 7-day forecast — all labeled in Persian, laid out right-to-left.
   7-day list is tinted and left-bordered by its weather category (sunny /
   cloudy / fog / rain / snow / storm), and a windy day gets an animated wind
   badge.
+- **~4-day precipitation outlook**: a small pill under the current-conditions
+  tip reads out whether rain or snow is expected around 4 days out and at
+  what probability (e.g. "احتمال باران در پنجشنبه (۴ روز دیگر): ۲۰٪"), so a
+  visitor doesn't have to scan the whole week to answer "do I need an
+  umbrella soon?".
+- **Hottest / coldest city right now**: a section at the bottom of the page
+  compares current temperatures across all 31 provincial capitals in a
+  single batched Open-Meteo request (`GET /api/highlights`) and shows the
+  current hottest and coldest city in the country.
 - **Plain-language tip**: the hero card shows a short, practical suggestion
   ("چتر همراه داشته باشید", "از کرم ضدآفتاب استفاده کنید"، etc.) based on the
-  current conditions, aimed at making the app immediately useful to a
-  non-technical visitor.
+  current conditions.
 - **Rebranded** to هواچه, with a custom sun/cloud speech-bubble mark used as
   both the header logo and the favicon (`favicon.svg`).
-- **Stronger mobile pass**: sticky, blurred header; 16px inputs (no iOS
-  auto-zoom); 44px+ tap targets; a 3-column quick-city grid and tighter
-  spacing under 480px; safe-area padding for notched phones.
+- **Fixed the mobile search bar**: it previously stretched taller than
+  intended due to inconsistent padding/line-height; the input and button now
+  have an explicit 44px height, and the button collapses to icon-only under
+  360px so nothing overflows on small phones. The header also hides its
+  subtitle and shrinks the logo under 480px to stay compact.
 
 ## A note on the weather provider
 
@@ -57,19 +70,23 @@ Open `http://localhost:3000` and search for a city (e.g. `تهران`, `Tokyo`,
 
 ```
 src/
+  shared/
+    cities.ts               # Iran's 31 provincial capitals (name, lat/lon, icon type)
   server/
-    index.ts            # Express app: serves public/, mounts /api
-    routes/weather.ts    # Geocoding + forecast fetch, response shaping
-    types/weather.ts      # Shared response/domain types
+    index.ts                 # Express app: serves public/, mounts /api
+    routes/weather.ts         # Geocoding + forecast fetch, response shaping
+    routes/highlights.ts       # Batched current-temp lookup -> hottest/coldest city
+    types/weather.ts            # Shared response/domain types
   client/
-    index.html            # Page shell (RTL, Persian labels, ARIA)
-    styles.css             # Sky-gradient theme, responsive layout
-    app.ts                  # Fetch, render, debounced search, scroll controls
-    weatherCodes.ts          # WMO code -> Persian label, icon key, category, tip text
-    icons.ts                  # Animated inline SVG weather icon set + wind badge
-    favicon.svg                # هواچه logo mark, used as favicon and header logo source
-public/                       # Build output served statically (generated)
-scripts/copy-static.mjs        # Copies index.html/styles.css into public/
+    index.html                # Page shell (RTL, Persian labels, ARIA)
+    styles.css                 # Sky-gradient theme, responsive layout, icon animations
+    app.ts                      # Fetch, render, debounced search, quick cities, outlook
+    weatherCodes.ts              # WMO code -> Persian label, icon key, category, tip text
+    icons.ts                      # Animated inline SVG weather icon set + wind badge
+    cityIcons.ts                   # Custom pin-based SVG icons per city type
+    favicon.svg                     # هواچه logo mark, used as favicon and header logo source
+public/                           # Build output served statically (generated)
+scripts/copy-static.mjs            # Copies index.html/styles.css/favicon.svg into public/
 ```
 
 ## How it works
