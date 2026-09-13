@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>هواچه | آب‌وهوای دقیق و ساده</title>
+  <meta name="description" content="هواچه؛ وضعیت آب‌وهوای هر شهر را به‌صورت لحظه‌ای، ساعتی و هفتگی، ساده و به فارسی ببینید." />
+  <meta name="theme-color" content="#1e6fd9" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link
+    href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="app-header">
+      <div class="app-header__brand">
+        <span class="app-header__logo" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 4a20 20 0 0 1 20 20c0 6-3 9-8 12l2 8-9-5c-9-1-15-7-15-15A20 20 0 0 1 8 4z" fill="#1E6FD9"/>
+            <circle cx="17" cy="17" r="6" fill="#F5A623"/>
+            <path d="M15 27a7 7 0 0 1 1-13.9A9 9 0 0 1 33.5 16H34a6 6 0 0 1 0 12H15z" fill="#ffffff"/>
+          </svg>
+        </span>
+        <div class="app-header__titles">
+          <h1 class="app-header__title">هواچه</h1>
+          <p class="app-header__subtitle">آب‌وهوای هر شهر، ساده و روشن</p>
+        </div>
+      </div>
+      <form class="search" id="search-form" role="search" aria-label="جست‌وجوی شهر">
+        <label class="visually-hidden" for="city-input">نام شهر را وارد کنید</label>
+        <input
+          type="text"
+          id="city-input"
+          name="city"
+          class="search__input"
+          placeholder="نام شهر را وارد کنید، مثلاً تبریز"
+          autocomplete="off"
+          aria-describedby="search-status"
+        />
+        <button type="submit" class="search__button">
+          <span>جست‌وجو</span>
+        </button>
+      </form>
+    </header>
+
+    <section class="quick-cities" aria-label="شهرهای پرطرفدار">
+      <h2 class="visually-hidden">انتخاب سریع شهر</h2>
+      <div class="quick-cities__grid" id="quick-cities">
+        <button type="button" class="city-card" data-city="تهران" aria-pressed="false">
+          <span class="city-card__icon" aria-hidden="true">🏙️</span>
+          <span class="city-card__name">تهران</span>
+        </button>
+        <button type="button" class="city-card" data-city="مشهد" aria-pressed="false">
+          <span class="city-card__icon" aria-hidden="true">🕌</span>
+          <span class="city-card__name">مشهد</span>
+        </button>
+        <button type="button" class="city-card" data-city="اصفهان" aria-pressed="false">
+          <span class="city-card__icon" aria-hidden="true">🕌</span>
+          <span class="city-card__name">اصفهان</span>
+        </button>
+        <button type="button" class="city-card" data-city="شیراز" aria-pressed="false">
+          <span class="city-card__icon" aria-hidden="true">🌹</span>
+          <span class="city-card__name">شیراز</span>
+        </button>
+        <button type="button" class="city-card" data-city="تبریز" aria-pressed="true">
+          <span class="city-card__icon" aria-hidden="true">🏔️</span>
+          <span class="city-card__name">تبریز</span>
+        </button>
+        <button type="button" class="city-card" data-city="اهواز" aria-pressed="false">
+          <span class="city-card__icon" aria-hidden="true">🌴</span>
+          <span class="city-card__name">اهواز</span>
+        </button>
+        <button type="button" class="city-card" data-city="کرج" aria-pressed="false">
+          <span class="city-card__icon" aria-hidden="true">🏘️</span>
+          <span class="city-card__name">کرج</span>
+        </button>
+        <button type="button" class="city-card" data-city="قم" aria-pressed="false">
+          <span class="city-card__icon" aria-hidden="true">🕌</span>
+          <span class="city-card__name">قم</span>
+        </button>
+      </div>
+    </section>
+
+    <main class="app-main">
+      <p id="search-status" class="visually-hidden" role="status" aria-live="polite"></p>
+
+      <section id="state-loading" class="state-panel" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>در حال دریافت اطلاعات آب‌وهوا…</p>
+      </section>
+
+      <section id="state-error" class="state-panel state-panel--hidden state-panel--error" role="alert">
+        <p id="error-message"></p>
+      </section>
+
+      <section id="weather-content" class="weather-content state-panel--hidden">
+        <!-- Current conditions hero -->
+        <section class="hero fade-in" id="hero" aria-label="وضعیت فعلی آب‌وهوا">
+          <div class="hero__primary">
+            <div class="hero__icon" id="hero-icon" aria-hidden="true"></div>
+            <div class="hero__temp-block">
+              <div class="hero__temp" id="hero-temp">--°</div>
+              <div class="hero__condition" id="hero-condition"></div>
+            </div>
+          </div>
+          <div class="hero__meta">
+            <div class="hero__location" id="hero-location"></div>
+            <div class="hero__feels-like">
+              دمای احساس‌شده: <span id="hero-feels-like">--°</span>
+            </div>
+            <div class="hero__updated">
+              به‌روزرسانی: <span id="hero-updated"></span>
+            </div>
+            <p class="hero__tip" id="hero-tip"></p>
+          </div>
+        </section>
+
+        <!-- Details grid -->
+        <section class="details-grid fade-in" aria-label="جزئیات آب‌وهوا">
+          <div class="detail-card">
+            <span class="detail-card__label" title="میزان رطوبت هوا">رطوبت</span>
+            <span class="detail-card__value" id="detail-humidity">--٪</span>
+          </div>
+          <div class="detail-card">
+            <span class="detail-card__label" title="سرعت وزش باد">سرعت باد</span>
+            <span class="detail-card__value" id="detail-wind">-- کیلومتر/ساعت</span>
+          </div>
+          <div class="detail-card">
+            <span class="detail-card__label" title="جهتی که باد از آن می‌وزد">جهت باد</span>
+            <span class="detail-card__value" id="detail-wind-direction">--</span>
+          </div>
+          <div class="detail-card">
+            <span class="detail-card__label" title="فشار هوا در سطح دریا">فشار هوا</span>
+            <span class="detail-card__value" id="detail-pressure">-- هکتوپاسکال</span>
+          </div>
+          <div class="detail-card">
+            <span class="detail-card__label" title="میزان تابش مضر خورشید؛ هرچه بیشتر، خطرناک‌تر">شاخص فرابنفش</span>
+            <span class="detail-card__value" id="detail-uv">--</span>
+          </div>
+          <div class="detail-card">
+            <span class="detail-card__label" title="حداکثر فاصله‌ای که به‌وضوح دیده می‌شود">دید افقی</span>
+            <span class="detail-card__value" id="detail-visibility">-- متر</span>
+          </div>
+          <div class="detail-card">
+            <span class="detail-card__label" title="زمان طلوع خورشید">طلوع آفتاب</span>
+            <span class="detail-card__value" id="detail-sunrise">--:--</span>
+          </div>
+          <div class="detail-card">
+            <span class="detail-card__label" title="زمان غروب خورشید">غروب آفتاب</span>
+            <span class="detail-card__value" id="detail-sunset">--:--</span>
+          </div>
+        </section>
+
+        <!-- Hourly forecast -->
+        <section class="panel fade-in" aria-label="پیش‌بینی ساعتی">
+          <div class="panel__header">
+            <h2 class="panel__title">پیش‌بینی ۲۴ ساعت آینده</h2>
+            <div class="scroll-buttons">
+              <button type="button" class="scroll-button" id="hourly-scroll-right" aria-label="نمایش ساعات بعدی">‹</button>
+              <button type="button" class="scroll-button" id="hourly-scroll-left" aria-label="نمایش ساعات قبلی">›</button>
+            </div>
+          </div>
+          <div class="hourly-rail" id="hourly-rail" tabindex="0" aria-label="فهرست ساعتی، قابل پیمایش افقی"></div>
+        </section>
+
+        <!-- Daily forecast -->
+        <section class="panel fade-in" aria-label="پیش‌بینی هفتگی">
+          <h2 class="panel__title">پیش‌بینی ۷ روز آینده</h2>
+          <ul class="daily-list" id="daily-list"></ul>
+        </section>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <p>
+        منبع داده: <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer">Open-Meteo</a>
+      </p>
+    </footer>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
