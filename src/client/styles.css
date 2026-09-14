@@ -34,12 +34,36 @@
   --cat-storm-bg: #f0ecfb;
 }
 
+:root[data-theme="dark"] {
+  --color-sky-top: #0f1720;
+  --color-sky-bottom: #0a0f16;
+  --color-primary: #4a9be8;
+  --color-primary-deep: #eaf4ff;
+  --color-accent: #f5a623;
+  --color-text: #e6edf5;
+  --color-text-muted: #93a0b3;
+  --color-border: #263241;
+  --color-surface: #151d28;
+  --color-surface-alt: #1b2531;
+
+  --cat-sunny-bg: #2a2210;
+  --cat-cloudy-bg: #1c222b;
+  --cat-fog-bg: #1c222b;
+  --cat-rain-bg: #142235;
+  --cat-snow-bg: #142a33;
+  --cat-storm-bg: #201a35;
+}
+
 * {
   box-sizing: border-box;
 }
 
 html {
   color-scheme: light;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 body {
@@ -50,6 +74,7 @@ body {
   min-height: 100vh;
   line-height: 1.6;
   -webkit-text-size-adjust: 100%;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .visually-hidden {
@@ -77,18 +102,10 @@ body {
 /* ---------- Header ---------- */
 
 .app-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-2) 0;
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) 0 0;
 }
 
 .app-header__brand {
@@ -127,18 +144,68 @@ body {
   color: var(--color-text-muted);
 }
 
+.app-header__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.theme-toggle {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-primary-deep);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-toggle:hover {
+  background: var(--color-surface-alt);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.theme-toggle__icon {
+  width: 20px;
+  height: 20px;
+}
+
+.theme-toggle__icon--sun {
+  display: none;
+}
+
+:root[data-theme="dark"] .theme-toggle__icon--moon {
+  display: none;
+}
+
+:root[data-theme="dark"] .theme-toggle__icon--sun {
+  display: block;
+}
+
 .search {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  flex: 1 1 320px;
-  max-width: 420px;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.search__field {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .search__input {
-  flex: 1 1 auto;
-  min-width: 0;
   width: 100%;
   height: 44px;
   box-sizing: border-box;
@@ -154,6 +221,49 @@ body {
 .search__input:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+.search__suggestions {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(11, 61, 117, 0.12);
+  max-height: 260px;
+  overflow-y: auto;
+  display: none;
+}
+
+.search__suggestions--open {
+  display: block;
+}
+
+.search__suggestion {
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--color-text);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.search__suggestion:hover,
+.search__suggestion--active {
+  background: var(--color-surface-alt);
+}
+
+.search__suggestion-region {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
 }
 
 .search__button {
@@ -193,6 +303,7 @@ body {
 }
 
 /* ---------- Quick city cards ---------- */
+
 
 .quick-cities__grid {
   display: grid;
@@ -463,6 +574,89 @@ body {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+/* ---------- Air quality ---------- */
+
+.aqi-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+
+.aqi-card__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.aqi-card__label {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.aqi-card__category {
+  font-weight: 700;
+  color: var(--color-primary-deep);
+}
+
+.aqi-card__value {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.aqi-card__number {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--color-primary-deep);
+}
+
+.aqi-card__unit {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.aqi-card--good {
+  border-inline-start: 4px solid #4caf50;
+}
+.aqi-card--moderate {
+  border-inline-start: 4px solid #f5c623;
+}
+.aqi-card--sensitive {
+  border-inline-start: 4px solid #f5a623;
+}
+.aqi-card--unhealthy {
+  border-inline-start: 4px solid #e0603f;
+}
+.aqi-card--very-unhealthy {
+  border-inline-start: 4px solid #9b4fc9;
+}
+.aqi-card--hazardous {
+  border-inline-start: 4px solid #7a1f2b;
+}
+
+.aqi-card--hidden {
+  display: none;
+}
+
+/* ---------- Charts ---------- */
+
+.chart-container {
+  overflow-x: auto;
+  margin-bottom: var(--space-2);
+}
+
+.line-chart__svg {
+  width: 100%;
+  height: 110px;
+  display: block;
+  min-width: 280px;
 }
 
 /* ---------- Details grid ---------- */
@@ -997,19 +1191,6 @@ body {
 }
 
 @media (max-width: 480px) {
-  .app-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .app-header__brand {
-    justify-content: center;
-  }
-
-  .search {
-    max-width: none;
-  }
-
   .app-header__subtitle {
     display: none;
   }
@@ -1017,6 +1198,14 @@ body {
   .app-header__logo {
     width: 32px;
     height: 32px;
+  }
+
+  .search__button .search__label {
+    display: none;
+  }
+
+  .search__button {
+    padding: 0 14px;
   }
 
   .details-grid {
@@ -1066,16 +1255,6 @@ body {
 
   .extremes__grid {
     grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 360px) {
-  .search__label {
-    display: none;
-  }
-
-  .search__button {
-    padding: 0 12px;
   }
 }
 

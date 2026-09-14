@@ -47,6 +47,13 @@ export interface DailyEntry {
   windSpeedMax: number;
 }
 
+export interface AirQuality {
+  usAqi: number | null;
+  pm2_5: number | null;
+  pm10: number | null;
+  category: string;
+}
+
 export interface WeatherResponse {
   location: {
     name: string;
@@ -57,7 +64,17 @@ export interface WeatherResponse {
   current: CurrentWeather;
   hourly: HourlyEntry[];
   daily: DailyEntry[];
+  airQuality: AirQuality | null;
   fetchedAt: string;
+}
+
+export interface GeocodeSuggestion {
+  name: string;
+  admin1?: string;
+  country: string;
+  latitude: number;
+  longitude: number;
+  timezone: string;
 }
 
 export interface ApiErrorBody {

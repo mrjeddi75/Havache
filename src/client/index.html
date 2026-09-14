@@ -30,25 +30,44 @@
           <p class="app-header__subtitle">آب‌وهوای هر شهر، ساده و روشن</p>
         </div>
       </div>
-      <form class="search" id="search-form" role="search" aria-label="جست‌وجوی شهر">
-        <label class="visually-hidden" for="city-input">نام شهر را وارد کنید</label>
-        <input
-          type="text"
-          id="city-input"
-          name="city"
-          class="search__input"
-          placeholder="نام شهر را وارد کنید، مثلاً تبریز"
-          autocomplete="off"
-          aria-describedby="search-status"
-        />
-        <button type="submit" class="search__button">
-          <svg class="search__icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="2"/>
-            <path d="M20 20l-4.5-4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <div class="app-header__controls">
+        <form class="search" id="search-form" role="search" aria-label="جست‌وجوی شهر">
+          <div class="search__field">
+            <label class="visually-hidden" for="city-input">نام شهر را وارد کنید</label>
+            <input
+              type="text"
+              id="city-input"
+              name="city"
+              class="search__input"
+              placeholder="نام شهر را وارد کنید، مثلاً تبریز"
+              autocomplete="off"
+              aria-describedby="search-status"
+              aria-expanded="false"
+              aria-controls="search-suggestions"
+              role="combobox"
+            />
+            <ul class="search__suggestions" id="search-suggestions" role="listbox"></ul>
+          </div>
+          <button type="submit" class="search__button">
+            <svg class="search__icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="2"/>
+              <path d="M20 20l-4.5-4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span class="search__label">جست‌وجو</span>
+          </button>
+        </form>
+        <button type="button" class="theme-toggle" id="theme-toggle" aria-label="تغییر به حالت شب">
+          <svg class="theme-toggle__icon theme-toggle__icon--moon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" fill="currentColor"/>
           </svg>
-          <span class="search__label">جست‌وجو</span>
+          <svg class="theme-toggle__icon theme-toggle__icon--sun" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="12" cy="12" r="4.5" fill="currentColor"/>
+            <g stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M12 2.5v2.5M12 19v2.5M21.5 12H19M5 12H2.5M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8M18.4 18.4l-1.8-1.8M7.4 7.4L5.6 5.6"/>
+            </g>
+          </svg>
         </button>
-      </form>
+      </div>
     </header>
 
     <section class="quick-cities" aria-label="شهرهای پرطرفدار">
@@ -94,6 +113,18 @@
               <span class="hero__outlook-icon" id="hero-outlook-icon" aria-hidden="true"></span>
               <span id="hero-outlook-text"></span>
             </p>
+          </div>
+        </section>
+
+        <!-- Air quality -->
+        <section class="aqi-card fade-in" id="aqi-card" aria-label="کیفیت هوا">
+          <div class="aqi-card__info">
+            <span class="aqi-card__label">کیفیت هوا</span>
+            <span class="aqi-card__category" id="aqi-category">--</span>
+          </div>
+          <div class="aqi-card__value">
+            <span class="aqi-card__number" id="aqi-number">--</span>
+            <span class="aqi-card__unit">AQI</span>
           </div>
         </section>
 
@@ -143,17 +174,19 @@
             </div>
           </div>
           <div class="hourly-rail" id="hourly-rail" tabindex="0" aria-label="فهرست ساعتی، قابل پیمایش افقی"></div>
+          <div class="chart-container" id="hourly-chart" aria-hidden="true"></div>
         </section>
 
         <!-- Daily forecast -->
         <section class="panel fade-in" aria-label="پیش‌بینی هفتگی">
           <h2 class="panel__title">پیش‌بینی ۷ روز آینده</h2>
+          <div class="chart-container" id="daily-chart" aria-hidden="true"></div>
           <ul class="daily-list" id="daily-list"></ul>
         </section>
       </section>
 
       <!-- Hottest / coldest city across Iran's provincial capitals -->
-      <section class="extremes fade-in" id="extremes" aria-label="گرم‌ترین و سردترین شهر کشور">
+      <section class="extremes fade-in state-panel--hidden" id="extremes" aria-label="گرم‌ترین و سردترین شهر کشور">
         <h2 class="extremes__title">گرم‌ترین و سردترین شهر کشور همین الان</h2>
         <div class="extremes__grid">
           <div class="extreme-card extreme-card--hot" id="extreme-hot">

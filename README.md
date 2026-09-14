@@ -6,39 +6,54 @@ and a 7-day forecast — all labeled in Persian, laid out right-to-left.
 
 ## What's new in this pass
 
-- **Never opens empty**: loads تبریز (Tabriz) automatically on page load.
-- **31 quick-select city cards**: every Iranian provincial capital
-  (`src/shared/cities.ts`) is a tappable square card, rendered dynamically —
-  collapsed to the first 10 by default with a "نمایش همه شهرها" toggle to
-  expand, so the panel doesn't overwhelm the page. Icons are custom SVG pins
-  (not emoji) themed by city type: capital, landmark, mountain, coastal, or
-  desert.
-- **Animated, condition-aware icons**: every icon (hero, hourly, daily) is a
-  small animated SVG — rays pulse on sunny days, clouds drift, raindrops and
-  snowflakes fall, storm bolts flash, fog lines fade in and out.
-- **Weekly forecast is visually distinct by condition**: each day in the
-  7-day list is tinted and left-bordered by its weather category (sunny /
-  cloudy / fog / rain / snow / storm), and a windy day gets an animated wind
-  badge.
-- **~4-day precipitation outlook**: a small pill under the current-conditions
-  tip reads out whether rain or snow is expected around 4 days out and at
-  what probability (e.g. "احتمال باران در پنجشنبه (۴ روز دیگر): ۲۰٪"), so a
-  visitor doesn't have to scan the whole week to answer "do I need an
-  umbrella soon?".
-- **Hottest / coldest city right now**: a section at the bottom of the page
-  compares current temperatures across all 31 provincial capitals in a
-  single batched Open-Meteo request (`GET /api/highlights`) and shows the
-  current hottest and coldest city in the country.
-- **Plain-language tip**: the hero card shows a short, practical suggestion
-  ("چتر همراه داشته باشید", "از کرم ضدآفتاب استفاده کنید"، etc.) based on the
-  current conditions.
-- **Rebranded** to هواچه, with a custom sun/cloud speech-bubble mark used as
-  both the header logo and the favicon (`favicon.svg`).
-- **Fixed the mobile search bar**: it previously stretched taller than
-  intended due to inconsistent padding/line-height; the input and button now
-  have an explicit 44px height, and the button collapses to icon-only under
-  360px so nothing overflows on small phones. The header also hides its
-  subtitle and shrinks the logo under 480px to stay compact.
+- **Fixed the mobile search-bar bug**: the header previously combined
+  `position: sticky` with `backdrop-filter`, a combination that some
+  Android WebViews (common on budget/older phones) render incorrectly,
+  reserving extra blank space around the search row. The header is now a
+  plain, non-sticky block with a simple column layout — no filter effects,
+  no ambiguous wrapping.
+- **Real cache-busting**: `app.js` and `styles.css` are now served with a
+  content-hash query string (`app.js?v=<hash>`) computed at build time
+  (`scripts/copy-static.mjs`), and `index.html` is served with
+  `Cache-Control: no-cache` while the hashed assets get a 1-year
+  `immutable` cache. This is almost certainly what caused the "already
+  fixed once, still shows the old layout" symptom — the browser was
+  serving a stale cached `app.js`/`index.html` pair after redeploying.
+  Every future deploy with changed content gets a new URL automatically.
+- **Server-side response caching**: `/api/weather`, `/api/highlights`, and
+  `/api/geocode` all cache upstream Open-Meteo responses in memory for
+  ~10 minutes, so many people requesting the same city (or the app's own
+  batched highlights lookup) within that window don't each trigger a
+  fresh upstream call.
+- **Air quality (AQI)**: each city's weather box now shows a color-coded
+  US AQI card (پاک و سالم → خطرناک) sourced from Open-Meteo's Air Quality
+  API, fetched in parallel with the forecast.
+- **24h / 7-day temperature charts**: a small dependency-free inline SVG
+  line chart (`src/client/chart.ts`) now sits above the hourly cards
+  (temperature trend) and above the daily list (max/min band across the
+  week).
+- **Autocomplete**: typing in the search box (2+ characters) now shows a
+  dropdown of matching cities from Open-Meteo's geocoding API instead of
+  re-fetching full weather data on every keystroke — arrow keys navigate,
+  Enter/click selects, and selecting a suggestion sends its coordinates
+  straight to `/api/weather` (skipping a second geocode round-trip on the
+  server).
+- **Dark mode**: a header toggle switches between light and dark palettes
+  (`src/client/theme.ts`), respecting the system's `prefers-color-scheme`
+  on first visit and remembering the choice in `localStorage`.
+- **31 quick-select city cards** (previous pass): every Iranian
+  provincial capital, collapsed to 10 with a "نمایش همه شهرها" toggle,
+  using custom SVG pin icons themed by city type.
+- **Animated, condition-aware icons, weekly-forecast tinting, ~4-day
+  precipitation outlook, and hottest/coldest city comparison** (previous
+  pass) — see below for details on each.
+
+Carried over from earlier passes: the page never opens empty (defaults to
+تبریز), every icon is a small animated SVG matched to the condition, each
+day in the 7-day list is tinted by weather category with a wind badge on
+windy days, a plain-language tip and a ~4-day rain/snow outlook sit under
+the current temperature, and the app is rebranded to هواچه with a custom
+sun/cloud logo used as both the header mark and the favicon.
 
 ## A note on the weather provider
 
@@ -73,20 +88,25 @@ src/
   shared/
     cities.ts               # Iran's 31 provincial capitals (name, lat/lon, icon type)
   server/
-    index.ts                 # Express app: serves public/, mounts /api
-    routes/weather.ts         # Geocoding + forecast fetch, response shaping
-    routes/highlights.ts       # Batched current-temp lookup -> hottest/coldest city
-    types/weather.ts            # Shared response/domain types
+    index.ts                 # Express app: static serving (with cache headers) + /api
+    routes/weather.ts         # Geocode/direct-coords -> forecast + AQI, cached
+    routes/highlights.ts       # Batched current-temp lookup -> hottest/coldest, cached
+    routes/geocode.ts           # Autocomplete suggestions, cached
+    utils/cache.ts                # Minimal in-memory TTL cache used by all three routes
+    types/weather.ts                # Shared response/domain types
   client/
     index.html                # Page shell (RTL, Persian labels, ARIA)
-    styles.css                 # Sky-gradient theme, responsive layout, icon animations
-    app.ts                      # Fetch, render, debounced search, quick cities, outlook
-    weatherCodes.ts              # WMO code -> Persian label, icon key, category, tip text
-    icons.ts                      # Animated inline SVG weather icon set + wind badge
-    cityIcons.ts                   # Custom pin-based SVG icons per city type
-    favicon.svg                     # هواچه logo mark, used as favicon and header logo source
-public/                           # Build output served statically (generated)
-scripts/copy-static.mjs            # Copies index.html/styles.css/favicon.svg into public/
+    styles.css                 # Theme (light/dark), layout, icon + chart styling
+    app.ts                      # Fetch, render, autocomplete, charts, theme wiring
+    theme.ts                     # Dark-mode init/toggle (localStorage + system preference)
+    aqi.ts                        # US AQI number -> Persian category + CSS class
+    chart.ts                       # Dependency-free inline SVG line chart builder
+    weatherCodes.ts                 # WMO code -> Persian label, icon key, category, tip text
+    icons.ts                         # Animated inline SVG weather icon set + wind badge
+    cityIcons.ts                      # Custom pin-based SVG icons per city type
+    favicon.svg                        # هواچه logo mark, used as favicon and header logo source
+public/                                # Build output served statically (generated)
+scripts/copy-static.mjs                 # Copies static assets, content-hashes JS/CSS, rewrites HTML
 ```
 
 ## How it works

@@ -1,17 +1,20 @@
 import { Router, type Request, type Response } from "express";
 import type {
+  AirQuality,
   ApiErrorBody,
   CurrentWeather,
   DailyEntry,
-  GeocodeResult,
+  GeocodeSuggestion,
   HourlyEntry,
   WeatherResponse,
 } from "../types/weather.js";
+import { TtlCache } from "../utils/cache.js";
 
 const router = Router();
 
 const GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
+const AIR_QUALITY_URL = "https://air-quality-api.open-meteo.com/v1/air-quality";
 
 /**
  * Open-Meteo is free and keyless for the endpoints this app uses.
@@ -20,6 +23,9 @@ const FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
  * not required for the app to function.
  */
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY ?? "";
+
+const WEATHER_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const weatherCache = new TtlCache<WeatherResponse>(WEATHER_CACHE_TTL_MS);
 
 interface OpenMeteoGeocodeResponse {
   results?: Array<{
@@ -65,11 +71,19 @@ interface OpenMeteoForecastResponse {
   };
 }
 
+interface OpenMeteoAirQualityResponse {
+  current?: {
+    us_aqi?: number;
+    pm2_5?: number;
+    pm10?: number;
+  };
+}
+
 function sendError(res: Response, status: number, body: ApiErrorBody): void {
   res.status(status).json(body);
 }
 
-async function geocodeCity(cityName: string): Promise<GeocodeResult | null> {
+async function geocodeCity(cityName: string): Promise<GeocodeSuggestion | null> {
   const url = new URL(GEOCODE_URL);
   url.searchParams.set("name", cityName);
   url.searchParams.set("count", "1");
@@ -95,7 +109,7 @@ async function geocodeCity(cityName: string): Promise<GeocodeResult | null> {
   };
 }
 
-async function fetchForecast(location: GeocodeResult): Promise<OpenMeteoForecastResponse> {
+async function fetchForecast(location: GeocodeSuggestion): Promise<OpenMeteoForecastResponse> {
   const url = new URL(FORECAST_URL);
   url.searchParams.set("latitude", String(location.latitude));
   url.searchParams.set("longitude", String(location.longitude));
@@ -141,6 +155,42 @@ async function fetchForecast(location: GeocodeResult): Promise<OpenMeteoForecast
   return (await response.json()) as OpenMeteoForecastResponse;
 }
 
+function classifyUsAqi(aqi: number): string {
+  if (aqi <= 50) return "پاک و سالم";
+  if (aqi <= 100) return "قابل قبول";
+  if (aqi <= 150) return "ناسالم برای گروه‌های حساس";
+  if (aqi <= 200) return "ناسالم";
+  if (aqi <= 300) return "بسیار ناسالم";
+  return "خطرناک";
+}
+
+async function fetchAirQuality(location: GeocodeSuggestion): Promise<AirQuality | null> {
+  try {
+    const url = new URL(AIR_QUALITY_URL);
+    url.searchParams.set("latitude", String(location.latitude));
+    url.searchParams.set("longitude", String(location.longitude));
+    url.searchParams.set("current", "us_aqi,pm2_5,pm10");
+    url.searchParams.set("timezone", location.timezone);
+
+    const response = await fetch(url);
+    if (!response.ok) return null;
+
+    const data = (await response.json()) as OpenMeteoAirQualityResponse;
+    const current = data.current;
+    if (!current || current.us_aqi === undefined) return null;
+
+    return {
+      usAqi: current.us_aqi,
+      pm2_5: current.pm2_5 ?? null,
+      pm10: current.pm10 ?? null,
+      category: classifyUsAqi(current.us_aqi),
+    };
+  } catch (err) {
+    console.error("Air quality lookup failed:", err);
+    return null;
+  }
+}
+
 function buildCurrent(raw: OpenMeteoForecastResponse): CurrentWeather {
   const c = raw.current;
   return {
@@ -168,7 +218,6 @@ function buildHourly(raw: OpenMeteoForecastResponse): HourlyEntry[] {
     isDay: raw.hourly.is_day[i] === 1,
   }));
 
-  // Keep the next 24 hours starting from the current hour.
   const fromNow = entries.filter((e) => new Date(e.time).getTime() >= now - 30 * 60 * 1000);
   return fromNow.slice(0, 24);
 }
@@ -187,10 +236,22 @@ function buildDaily(raw: OpenMeteoForecastResponse): DailyEntry[] {
   }));
 }
 
+function cacheKeyFor(location: GeocodeSuggestion): string {
+  return `${location.latitude.toFixed(2)},${location.longitude.toFixed(2)}`;
+}
+
 router.get("/weather", async (req: Request, res: Response) => {
   const city = typeof req.query.city === "string" ? req.query.city.trim() : "";
+  const lat = typeof req.query.lat === "string" ? Number(req.query.lat) : undefined;
+  const lon = typeof req.query.lon === "string" ? Number(req.query.lon) : undefined;
+  const name = typeof req.query.name === "string" ? req.query.name : undefined;
+  const region = typeof req.query.region === "string" ? req.query.region : undefined;
+  const country = typeof req.query.country === "string" ? req.query.country : undefined;
+  const timezone = typeof req.query.timezone === "string" ? req.query.timezone : undefined;
 
-  if (!city) {
+  const hasDirectCoords = lat !== undefined && lon !== undefined && !Number.isNaN(lat) && !Number.isNaN(lon);
+
+  if (!city && !hasDirectCoords) {
     sendError(res, 400, {
       error: "missing_city",
       message: "نام شهر ارسال نشده است.",
@@ -199,7 +260,22 @@ router.get("/weather", async (req: Request, res: Response) => {
   }
 
   try {
-    const location = await geocodeCity(city);
+    let location: GeocodeSuggestion | null;
+
+    if (hasDirectCoords) {
+      // Selected from autocomplete — coordinates already known, skip geocoding.
+      location = {
+        name: name || city || "",
+        admin1: region,
+        country: country || "",
+        latitude: lat as number,
+        longitude: lon as number,
+        timezone: timezone || "auto",
+      };
+    } else {
+      location = await geocodeCity(city);
+    }
+
     if (!location) {
       sendError(res, 404, {
         error: "city_not_found",
@@ -208,7 +284,14 @@ router.get("/weather", async (req: Request, res: Response) => {
       return;
     }
 
-    const raw = await fetchForecast(location);
+    const cacheKey = cacheKeyFor(location);
+    const cached = weatherCache.get(cacheKey);
+    if (cached) {
+      res.json(cached);
+      return;
+    }
+
+    const [raw, airQuality] = await Promise.all([fetchForecast(location), fetchAirQuality(location)]);
 
     const payload: WeatherResponse = {
       location: {
@@ -220,9 +303,11 @@ router.get("/weather", async (req: Request, res: Response) => {
       current: buildCurrent(raw),
       hourly: buildHourly(raw),
       daily: buildDaily(raw),
+      airQuality,
       fetchedAt: new Date().toISOString(),
     };
 
+    weatherCache.set(cacheKey, payload);
     res.json(payload);
   } catch (err) {
     console.error("Weather lookup failed:", err);

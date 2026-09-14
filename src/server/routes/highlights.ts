@@ -1,10 +1,14 @@
 import { Router, type Request, type Response } from "express";
 import { CITIES } from "../../shared/cities.js";
 import type { ApiErrorBody } from "../types/weather.js";
+import { TtlCache } from "../utils/cache.js";
 
 const router = Router();
 
 const FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
+const HIGHLIGHTS_CACHE_TTL_MS = 10 * 60 * 1000;
+const highlightsCache = new TtlCache<HighlightsResponse>(HIGHLIGHTS_CACHE_TTL_MS);
+const HIGHLIGHTS_CACHE_KEY = "highlights";
 
 interface BatchLocationResult {
   current?: {
@@ -48,6 +52,12 @@ async function fetchBatchCurrent(): Promise<BatchLocationResult[]> {
 }
 
 router.get("/highlights", async (_req: Request, res: Response) => {
+  const cached = highlightsCache.get(HIGHLIGHTS_CACHE_KEY);
+  if (cached) {
+    res.json(cached);
+    return;
+  }
+
   try {
     const results = await fetchBatchCurrent();
 
@@ -74,6 +84,7 @@ router.get("/highlights", async (_req: Request, res: Response) => {
       updatedAt: new Date().toISOString(),
     };
 
+    highlightsCache.set(HIGHLIGHTS_CACHE_KEY, payload);
     res.json(payload);
   } catch (err) {
     console.error("Highlights lookup failed:", err);

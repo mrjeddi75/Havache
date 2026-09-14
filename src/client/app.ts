@@ -2,6 +2,9 @@ import { describeWeatherCode, windDirectionLabel, conditionTip, type Category } 
 import { weatherIcon, windBadgeSvg } from "./icons.js";
 import { cityIconSvg } from "./cityIcons.js";
 import { CITIES } from "../shared/cities.js";
+import { initTheme, toggleTheme } from "./theme.js";
+import { classifyAqi } from "./aqi.js";
+import { buildLineChart } from "./chart.js";
 
 interface CurrentWeather {
   temperature: number;
@@ -37,6 +40,13 @@ interface DailyEntry {
   windSpeedMax: number;
 }
 
+interface AirQuality {
+  usAqi: number | null;
+  pm2_5: number | null;
+  pm10: number | null;
+  category: string;
+}
+
 interface WeatherResponse {
   location: {
     name: string;
@@ -47,7 +57,17 @@ interface WeatherResponse {
   current: CurrentWeather;
   hourly: HourlyEntry[];
   daily: DailyEntry[];
+  airQuality: AirQuality | null;
   fetchedAt: string;
+}
+
+interface GeocodeSuggestion {
+  name: string;
+  admin1?: string;
+  country: string;
+  latitude: number;
+  longitude: number;
+  timezone: string;
 }
 
 interface ApiErrorBody {
@@ -67,16 +87,20 @@ interface HighlightsResponse {
   updatedAt: string;
 }
 
-const DEBOUNCE_MS = 300;
 const DEFAULT_CITY = "تبریز";
 const WINDY_THRESHOLD_KMH = 35;
 const OUTLOOK_DAY_OFFSET = 4; // "~4 days from now"
 const OUTLOOK_MIN_PROBABILITY = 10;
+const SUGGESTIONS_DEBOUNCE_MS = 250;
+const SUGGESTIONS_MIN_LENGTH = 2;
 
 const els = {
   form: document.getElementById("search-form") as HTMLFormElement,
   input: document.getElementById("city-input") as HTMLInputElement,
+  searchField: document.querySelector(".search__field") as HTMLElement,
+  suggestions: document.getElementById("search-suggestions") as HTMLUListElement,
   status: document.getElementById("search-status") as HTMLParagraphElement,
+  themeToggle: document.getElementById("theme-toggle") as HTMLButtonElement,
 
   quickCities: document.getElementById("quick-cities") as HTMLElement,
   quickCitiesToggle: document.getElementById("quick-cities-toggle") as HTMLButtonElement,
@@ -97,6 +121,10 @@ const els = {
   heroOutlookIcon: document.getElementById("hero-outlook-icon") as HTMLElement,
   heroOutlookText: document.getElementById("hero-outlook-text") as HTMLElement,
 
+  aqiCard: document.getElementById("aqi-card") as HTMLElement,
+  aqiCategory: document.getElementById("aqi-category") as HTMLElement,
+  aqiNumber: document.getElementById("aqi-number") as HTMLElement,
+
   detailHumidity: document.getElementById("detail-humidity") as HTMLElement,
   detailWind: document.getElementById("detail-wind") as HTMLElement,
   detailWindDirection: document.getElementById("detail-wind-direction") as HTMLElement,
@@ -107,20 +135,29 @@ const els = {
   detailSunset: document.getElementById("detail-sunset") as HTMLElement,
 
   hourlyRail: document.getElementById("hourly-rail") as HTMLElement,
+  hourlyChart: document.getElementById("hourly-chart") as HTMLElement,
   scrollLeft: document.getElementById("hourly-scroll-left") as HTMLButtonElement,
   scrollRight: document.getElementById("hourly-scroll-right") as HTMLButtonElement,
 
   dailyList: document.getElementById("daily-list") as HTMLUListElement,
+  dailyChart: document.getElementById("daily-chart") as HTMLElement,
 
+  extremes: document.getElementById("extremes") as HTMLElement,
   extremeHotCity: document.getElementById("extreme-hot-city") as HTMLElement,
   extremeHotTemp: document.getElementById("extreme-hot-temp") as HTMLElement,
   extremeColdCity: document.getElementById("extreme-cold-city") as HTMLElement,
   extremeColdTemp: document.getElementById("extreme-cold-temp") as HTMLElement,
 };
 
-let debounceTimer: number | undefined;
-
 const HERO_CATEGORY_CLASSES = ["hero--sunny", "hero--cloudy", "hero--fog", "hero--rain", "hero--snow", "hero--storm"];
+const AQI_CLASSES = [
+  "aqi-card--good",
+  "aqi-card--moderate",
+  "aqi-card--sensitive",
+  "aqi-card--unhealthy",
+  "aqi-card--very-unhealthy",
+  "aqi-card--hazardous",
+];
 
 function showState(state: "loading" | "error" | "content"): void {
   els.stateLoading.classList.toggle("state-panel--hidden", state !== "loading");
@@ -143,7 +180,6 @@ function setHeroCategory(category: Category): void {
   els.hero.classList.add(`hero--${category}`);
 }
 
-/** Plain-language "will it rain/snow in ~4 days" line, for people who don't want to scan the whole week. */
 function renderOutlook(daily: DailyEntry[]): void {
   const entry = daily[OUTLOOK_DAY_OFFSET];
   if (!entry) {
@@ -166,6 +202,42 @@ function renderOutlook(daily: DailyEntry[]): void {
 
   els.heroOutlookIcon.innerHTML = weatherIcon(info.icon);
   els.heroOutlookText.textContent = `احتمال ${precipWord} در ${weekday} (۴ روز دیگر): ${prob}٪`;
+}
+
+function renderAqi(airQuality: AirQuality | null): void {
+  if (!airQuality || airQuality.usAqi === null) {
+    els.aqiCard.classList.add("aqi-card--hidden");
+    return;
+  }
+
+  els.aqiCard.classList.remove("aqi-card--hidden");
+  els.aqiCard.classList.remove(...AQI_CLASSES);
+
+  const { label, className } = classifyAqi(airQuality.usAqi);
+  els.aqiCard.classList.add(className);
+  els.aqiCategory.textContent = label;
+  els.aqiNumber.textContent = String(Math.round(airQuality.usAqi));
+}
+
+function renderCharts(hourly: HourlyEntry[], daily: DailyEntry[]): void {
+  if (hourly.length > 0) {
+    const hourlyLabels = hourly.map((h) => formatTime(h.time));
+    els.hourlyChart.innerHTML = buildLineChart(
+      [{ values: hourly.map((h) => h.temperature), colorVar: "--color-primary" }],
+      hourlyLabels
+    );
+  }
+
+  if (daily.length > 0) {
+    const dailyLabels = daily.map((d) => formatWeekday(d.date));
+    els.dailyChart.innerHTML = buildLineChart(
+      [
+        { values: daily.map((d) => d.temperatureMax), colorVar: "--color-accent" },
+        { values: daily.map((d) => d.temperatureMin), colorVar: "--color-primary" },
+      ],
+      dailyLabels
+    );
+  }
 }
 
 function renderHero(data: WeatherResponse): void {
@@ -260,9 +332,11 @@ function renderDaily(daily: DailyEntry[]): void {
 
 function renderWeather(data: WeatherResponse): void {
   renderHero(data);
+  renderAqi(data.airQuality);
   renderDetails(data);
   renderHourly(data.hourly);
   renderDaily(data.daily);
+  renderCharts(data.hourly, data.daily);
   showState("content");
 }
 
@@ -273,13 +347,13 @@ function setActiveCityCard(city: string): void {
   });
 }
 
-async function fetchWeather(city: string): Promise<void> {
+async function runWeatherFetch(url: string, activeCityForCards: string): Promise<void> {
   showState("loading");
   els.status.textContent = "در حال جست‌وجو…";
-  setActiveCityCard(city);
+  setActiveCityCard(activeCityForCards);
 
   try {
-    const response = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
+    const response = await fetch(url);
     const body = await response.json();
 
     if (!response.ok) {
@@ -295,6 +369,22 @@ async function fetchWeather(city: string): Promise<void> {
     showState("error");
     els.status.textContent = message;
   }
+}
+
+function fetchWeather(city: string): Promise<void> {
+  return runWeatherFetch(`/api/weather?city=${encodeURIComponent(city)}`, city);
+}
+
+function fetchWeatherByLocation(loc: GeocodeSuggestion): Promise<void> {
+  const params = new URLSearchParams({
+    lat: String(loc.latitude),
+    lon: String(loc.longitude),
+    name: loc.name,
+    country: loc.country,
+    timezone: loc.timezone,
+  });
+  if (loc.admin1) params.set("region", loc.admin1);
+  return runWeatherFetch(`/api/weather?${params.toString()}`, loc.name);
 }
 
 function renderQuickCities(): void {
@@ -327,24 +417,123 @@ async function loadHighlights(): Promise<void> {
       els.extremeColdCity.textContent = data.coldest.name;
       els.extremeColdTemp.textContent = `${Math.round(data.coldest.temperature)}°`;
     }
+    if (data.hottest || data.coldest) {
+      els.extremes.classList.remove("state-panel--hidden");
+    }
   } catch {
-    // Non-critical section; fail silently and leave the placeholders.
+    // Non-critical section; fail silently and leave it hidden.
   }
 }
 
-function handleInputDebounced(): void {
-  window.clearTimeout(debounceTimer);
-  const value = els.input.value.trim();
-  if (!value) return;
+/* ---------- Autocomplete ---------- */
 
-  debounceTimer = window.setTimeout(() => {
-    fetchWeather(value);
-  }, DEBOUNCE_MS);
+let suggestionsDebounceTimer: number | undefined;
+let currentSuggestions: GeocodeSuggestion[] = [];
+let activeSuggestionIndex = -1;
+
+function closeSuggestions(): void {
+  els.suggestions.classList.remove("search__suggestions--open");
+  els.suggestions.innerHTML = "";
+  currentSuggestions = [];
+  activeSuggestionIndex = -1;
+  els.input.setAttribute("aria-expanded", "false");
 }
+
+function updateActiveSuggestion(optionEls: HTMLLIElement[]): void {
+  optionEls.forEach((el, i) => el.classList.toggle("search__suggestion--active", i === activeSuggestionIndex));
+}
+
+function renderSuggestions(items: GeocodeSuggestion[]): void {
+  currentSuggestions = items;
+  activeSuggestionIndex = -1;
+
+  if (items.length === 0) {
+    closeSuggestions();
+    return;
+  }
+
+  els.suggestions.innerHTML = items
+    .map(
+      (item, i) => `
+      <li class="search__suggestion" role="option" data-index="${i}">
+        <span>${item.name}</span>
+        <span class="search__suggestion-region">${[item.admin1, item.country].filter(Boolean).join("، ")}</span>
+      </li>`
+    )
+    .join("");
+  els.suggestions.classList.add("search__suggestions--open");
+  els.input.setAttribute("aria-expanded", "true");
+}
+
+async function fetchSuggestions(query: string): Promise<void> {
+  if (query.trim().length < SUGGESTIONS_MIN_LENGTH) {
+    closeSuggestions();
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/geocode?query=${encodeURIComponent(query)}`);
+    if (!response.ok) return;
+    const items = (await response.json()) as GeocodeSuggestion[];
+    renderSuggestions(items);
+  } catch {
+    // Non-critical; leave the dropdown as-is.
+  }
+}
+
+function selectSuggestion(item: GeocodeSuggestion): void {
+  els.input.value = item.name;
+  closeSuggestions();
+  fetchWeatherByLocation(item);
+}
+
+els.input.addEventListener("input", () => {
+  window.clearTimeout(suggestionsDebounceTimer);
+  const value = els.input.value;
+  suggestionsDebounceTimer = window.setTimeout(() => fetchSuggestions(value), SUGGESTIONS_DEBOUNCE_MS);
+});
+
+els.input.addEventListener("keydown", (event) => {
+  if (!els.suggestions.classList.contains("search__suggestions--open")) return;
+  const optionEls = Array.from(els.suggestions.querySelectorAll<HTMLLIElement>(".search__suggestion"));
+
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    activeSuggestionIndex = Math.min(activeSuggestionIndex + 1, optionEls.length - 1);
+    updateActiveSuggestion(optionEls);
+  } else if (event.key === "ArrowUp") {
+    event.preventDefault();
+    activeSuggestionIndex = Math.max(activeSuggestionIndex - 1, 0);
+    updateActiveSuggestion(optionEls);
+  } else if (event.key === "Enter") {
+    if (activeSuggestionIndex >= 0 && currentSuggestions[activeSuggestionIndex]) {
+      event.preventDefault();
+      selectSuggestion(currentSuggestions[activeSuggestionIndex]);
+    }
+  } else if (event.key === "Escape") {
+    closeSuggestions();
+  }
+});
+
+els.suggestions.addEventListener("click", (event) => {
+  const li = (event.target as HTMLElement).closest<HTMLLIElement>(".search__suggestion");
+  if (!li) return;
+  const index = Number(li.dataset.index);
+  const item = currentSuggestions[index];
+  if (item) selectSuggestion(item);
+});
+
+document.addEventListener("click", (event) => {
+  if (!els.searchField.contains(event.target as Node)) {
+    closeSuggestions();
+  }
+});
+
+/* ---------- Wiring ---------- */
 
 els.form.addEventListener("submit", (event) => {
   event.preventDefault();
-  window.clearTimeout(debounceTimer);
+  closeSuggestions();
   const value = els.input.value.trim();
   if (!value) {
     els.status.textContent = "لطفاً نام یک شهر را وارد کنید.";
@@ -353,7 +542,7 @@ els.form.addEventListener("submit", (event) => {
   fetchWeather(value);
 });
 
-els.input.addEventListener("input", handleInputDebounced);
+els.themeToggle.addEventListener("click", toggleTheme);
 
 els.scrollRight.addEventListener("click", () => {
   els.hourlyRail.scrollBy({ left: -240, behavior: "smooth" });
@@ -376,7 +565,9 @@ els.quickCitiesToggle.addEventListener("click", () => {
   els.quickCitiesToggle.textContent = collapsed ? "نمایش همه شهرها" : "نمایش کمتر";
 });
 
-// Load a sensible default so the page never opens empty.
+/* ---------- Init ---------- */
+
+initTheme();
 renderQuickCities();
 els.input.value = DEFAULT_CITY;
 fetchWeather(DEFAULT_CITY);
