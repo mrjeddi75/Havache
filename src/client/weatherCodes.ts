@@ -75,22 +75,17 @@ export function windDirectionLabel(deg: number): string {
 }
 
 /** A short, plain-language tip for the general public based on current conditions. */
-export function conditionTip(params: {
-  category: Category;
-  temperature: number;
-  uvIndex: number;
-  windSpeed: number;
-}): string {
-  const { category, temperature, uvIndex, windSpeed } = params;
+export function conditionTip(params: { category: Category; temperature: number; windSpeed: number }): string {
+  const { category, temperature, windSpeed } = params;
 
   if (category === "storm") return "بهتر است این ساعت‌ها بیرون از خانه نمانید.";
-  if (category === "snow") return "جاده‌ها لغزنده‌اند، با احتیاط رانندگی کنید.";
-  if (category === "rain") return "چتر یا بارانی همراه داشته باشید.";
+  if (category === "snow") return "از بارش برف لذت ببر!";
+  if (category === "rain") return "امروز بارون می‌باره، چتر داشته باش.";
   if (category === "fog") return "دید کم است، در رانندگی احتیاط کنید.";
   if (windSpeed >= 40) return "باد نسبتاً شدید است، مراقب اشیای سبک باشید.";
-  if (uvIndex >= 7) return "تابش آفتاب شدید است، از کرم ضدآفتاب استفاده کنید.";
-  if (temperature >= 35) return "هوا بسیار گرم است، آب کافی بنوشید.";
-  if (temperature <= 2) return "هوا سرد است، لباس گرم بپوشید.";
-  if (category === "sunny") return "هوای مناسبی برای بیرون رفتن است.";
-  return "هوا امروز ملایم و معمولی است.";
+
+  if (temperature > 40) return "خیلی گرمه، مراقب خودت باش.";
+  if (temperature > 30) return "تابش آفتاب شدید است، از کرم ضدآفتاب استفاده کنید.";
+  if (temperature < 20) return "مراقب باش سرما نخوری.";
+  return "هوا خوبه، لذت ببرید.";
 }

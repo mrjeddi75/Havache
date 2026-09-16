@@ -38,6 +38,47 @@ and a 7-day forecast — all labeled in Persian, laid out right-to-left.
   Enter/click selects, and selecting a suggestion sends its coordinates
   straight to `/api/weather` (skipping a second geocode round-trip on the
   server).
+- **Readable charts**: both the 24h and 7-day temperature charts now have
+  x-axis time/day labels, light gridlines, the hottest and coldest point
+  called out directly on the chart with its value, and a plain-text
+  caption underneath ("گرم‌ترین ساعت: ۱۵:۰۰ (۲۸°) · سردترین ساعت: ۰۴:۰۰
+  (۱۲°)") — a bare line didn't tell you *when* it's hot or cold, so now
+  both the visual and the text say so explicitly.
+- **Three polish fixes on the charts and tips**:
+  - The coldest-point value label on a chart could land exactly on top of
+    the x-axis day label when the lowest point fell at the very bottom of
+    the plot (visible as "15°" overlapping "دوشنبه"). The label position
+    is now clamped so it can never reach the axis-label zone.
+  - The "rain/snow in ~4 days" line now scans the *entire* week ahead
+    instead of checking one fixed day — if nothing's expected all week it
+    says so plainly ("تا یک هفته آینده بارشی پیش‌بینی نمی‌شود"), and if a
+    day does have rain or snow, it names that day and its probability.
+  - The hero tip now uses clear temperature bands (>40° "خیلی گرمه،
+    مراقب خودت باش", >30° sunscreen advice, <20° "مراقب باش سرما نخوری",
+    otherwise "هوا خوبه، لذت ببرید") and friendlier rain/snow wording
+    ("امروز بارون می‌باره، چتر داشته باش" / "از بارش برف لذت ببر!").
+  - The heatmap now has a one-line analysis underneath: the 31-province
+    average temperature, and how many provinces currently have rain vs.
+    snow (only precipitation is called out, as requested).
+  1. **Day-length trend** — "طول روز امروز: ۱۳ ساعت و ۴۲ دقیقه (در حال
+     بلندتر شدن، ۲ دقیقه در روز)", computed from today vs. tomorrow's
+     sunrise/sunset, no extra API call.
+  2. **Historical climate comparison** — a new card next to AQI shows
+     whether today is warmer/cooler than the average for this same
+     calendar date over the last 10 years, using Open-Meteo's free
+     Archive API in a single request (`fetchClimateComparison` in
+     `weather.ts`), cached 24h since it barely changes within a day.
+  3. **Nationwide temperature heatmap** — `/api/highlights` now returns
+     all 31 provincial capitals' current temperatures (not just
+     hottest/coldest), rendered as a color-graded grid (blue → yellow →
+     red) at the bottom of the page.
+  4. **"Best day this week"** — a callout above the weekly chart picks
+     the most comfortable day using a simple score (mild temperature,
+     low rain chance, low wind) computed client-side from data already
+     in the response.
+  5. **هواچه mascot** — a small cloud-character SVG next to the tip text
+     whose face expression changes with the weather category (happy in
+     the sun, sleepy in fog, shivering in snow, startled in a storm).
 - **Dark mode**: a header toggle switches between light and dark palettes
   (`src/client/theme.ts`), respecting the system's `prefers-color-scheme`
   on first visit and remembering the choice in `localStorage`.
@@ -89,23 +130,25 @@ src/
     cities.ts               # Iran's 31 provincial capitals (name, lat/lon, icon type)
   server/
     index.ts                 # Express app: static serving (with cache headers) + /api
-    routes/weather.ts         # Geocode/direct-coords -> forecast + AQI, cached
-    routes/highlights.ts       # Batched current-temp lookup -> hottest/coldest, cached
+    routes/weather.ts         # Geocode/direct-coords -> forecast + AQI + climate, cached
+    routes/highlights.ts       # Batched current-temp lookup -> extremes + full city list, cached
     routes/geocode.ts           # Autocomplete suggestions, cached
-    utils/cache.ts                # Minimal in-memory TTL cache used by all three routes
+    utils/cache.ts                # Minimal in-memory TTL cache used by all routes
     types/weather.ts                # Shared response/domain types
   client/
     index.html                # Page shell (RTL, Persian labels, ARIA)
-    styles.css                 # Theme (light/dark), layout, icon + chart styling
+    styles.css                 # Theme (light/dark), layout, icon + chart + heatmap styling
     app.ts                      # Fetch, render, autocomplete, charts, theme wiring
     theme.ts                     # Dark-mode init/toggle (localStorage + system preference)
     aqi.ts                        # US AQI number -> Persian category + CSS class
     chart.ts                       # Dependency-free inline SVG line chart builder
-    weatherCodes.ts                 # WMO code -> Persian label, icon key, category, tip text
-    icons.ts                         # Animated inline SVG weather icon set + wind badge
-    cityIcons.ts                      # Custom pin-based SVG icons per city type
-    favicon.svg                        # هواچه logo mark, used as favicon and header logo source
-public/                                # Build output served statically (generated)
+    mascot.ts                       # هواچه mascot SVG, expression keyed by weather category
+    heatColor.ts                     # Blue->yellow->red color interpolation for the heatmap
+    weatherCodes.ts                   # WMO code -> Persian label, icon key, category, tip text
+    icons.ts                           # Animated inline SVG weather icon set + wind badge
+    cityIcons.ts                        # Custom pin-based SVG icons per city type
+    favicon.svg                          # هواچه logo mark, used as favicon and header logo source
+public/                                  # Build output served statically (generated)
 scripts/copy-static.mjs                 # Copies static assets, content-hashes JS/CSS, rewrites HTML
 ```
 

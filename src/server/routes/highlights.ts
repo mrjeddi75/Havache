@@ -26,6 +26,7 @@ interface CityExtreme {
 interface HighlightsResponse {
   hottest: CityExtreme | null;
   coldest: CityExtreme | null;
+  cities: CityExtreme[];
   updatedAt: string;
 }
 
@@ -63,6 +64,7 @@ router.get("/highlights", async (_req: Request, res: Response) => {
 
     let hottest: CityExtreme | null = null;
     let coldest: CityExtreme | null = null;
+    const cities: CityExtreme[] = [];
 
     results.forEach((result, index) => {
       const city = CITIES[index];
@@ -74,6 +76,7 @@ router.get("/highlights", async (_req: Request, res: Response) => {
         weatherCode: result.current.weather_code,
       };
 
+      cities.push(candidate);
       if (!hottest || candidate.temperature > hottest.temperature) hottest = candidate;
       if (!coldest || candidate.temperature < coldest.temperature) coldest = candidate;
     });
@@ -81,6 +84,7 @@ router.get("/highlights", async (_req: Request, res: Response) => {
     const payload: HighlightsResponse = {
       hottest,
       coldest,
+      cities,
       updatedAt: new Date().toISOString(),
     };
 

@@ -5,6 +5,8 @@ import { CITIES } from "../shared/cities.js";
 import { initTheme, toggleTheme } from "./theme.js";
 import { classifyAqi } from "./aqi.js";
 import { buildLineChart } from "./chart.js";
+import { mascotSvg } from "./mascot.js";
+import { heatColor } from "./heatColor.js";
 
 interface CurrentWeather {
   temperature: number;
@@ -47,6 +49,13 @@ interface AirQuality {
   category: string;
 }
 
+interface ClimateComparison {
+  avgMax: number;
+  avgMin: number;
+  diffFromAvgMax: number;
+  yearsUsed: number;
+}
+
 interface WeatherResponse {
   location: {
     name: string;
@@ -58,6 +67,7 @@ interface WeatherResponse {
   hourly: HourlyEntry[];
   daily: DailyEntry[];
   airQuality: AirQuality | null;
+  climateComparison: ClimateComparison | null;
   fetchedAt: string;
 }
 
@@ -84,12 +94,12 @@ interface CityExtreme {
 interface HighlightsResponse {
   hottest: CityExtreme | null;
   coldest: CityExtreme | null;
+  cities: CityExtreme[];
   updatedAt: string;
 }
 
 const DEFAULT_CITY = "تبریز";
 const WINDY_THRESHOLD_KMH = 35;
-const OUTLOOK_DAY_OFFSET = 4; // "~4 days from now"
 const OUTLOOK_MIN_PROBABILITY = 10;
 const SUGGESTIONS_DEBOUNCE_MS = 250;
 const SUGGESTIONS_MIN_LENGTH = 2;
@@ -118,12 +128,19 @@ const els = {
   heroFeelsLike: document.getElementById("hero-feels-like") as HTMLElement,
   heroUpdated: document.getElementById("hero-updated") as HTMLElement,
   heroTip: document.getElementById("hero-tip") as HTMLElement,
+  heroMascot: document.getElementById("hero-mascot") as HTMLElement,
   heroOutlookIcon: document.getElementById("hero-outlook-icon") as HTMLElement,
   heroOutlookText: document.getElementById("hero-outlook-text") as HTMLElement,
+  heroDaylength: document.getElementById("hero-daylength") as HTMLElement,
 
   aqiCard: document.getElementById("aqi-card") as HTMLElement,
   aqiCategory: document.getElementById("aqi-category") as HTMLElement,
   aqiNumber: document.getElementById("aqi-number") as HTMLElement,
+
+  climateCard: document.getElementById("climate-card") as HTMLElement,
+  climateText: document.getElementById("climate-text") as HTMLElement,
+
+  bestDayCallout: document.getElementById("best-day-callout") as HTMLElement,
 
   detailHumidity: document.getElementById("detail-humidity") as HTMLElement,
   detailWind: document.getElementById("detail-wind") as HTMLElement,
@@ -136,17 +153,21 @@ const els = {
 
   hourlyRail: document.getElementById("hourly-rail") as HTMLElement,
   hourlyChart: document.getElementById("hourly-chart") as HTMLElement,
+  hourlyChartCaption: document.getElementById("hourly-chart-caption") as HTMLElement,
   scrollLeft: document.getElementById("hourly-scroll-left") as HTMLButtonElement,
   scrollRight: document.getElementById("hourly-scroll-right") as HTMLButtonElement,
 
   dailyList: document.getElementById("daily-list") as HTMLUListElement,
   dailyChart: document.getElementById("daily-chart") as HTMLElement,
+  dailyChartCaption: document.getElementById("daily-chart-caption") as HTMLElement,
 
   extremes: document.getElementById("extremes") as HTMLElement,
   extremeHotCity: document.getElementById("extreme-hot-city") as HTMLElement,
   extremeHotTemp: document.getElementById("extreme-hot-temp") as HTMLElement,
   extremeColdCity: document.getElementById("extreme-cold-city") as HTMLElement,
   extremeColdTemp: document.getElementById("extreme-cold-temp") as HTMLElement,
+  heatmap: document.getElementById("heatmap") as HTMLElement,
+  heatmapAnalysis: document.getElementById("heatmap-analysis") as HTMLElement,
 };
 
 const HERO_CATEGORY_CLASSES = ["hero--sunny", "hero--cloudy", "hero--fog", "hero--rain", "hero--snow", "hero--storm"];
@@ -158,6 +179,8 @@ const AQI_CLASSES = [
   "aqi-card--very-unhealthy",
   "aqi-card--hazardous",
 ];
+const CLIMATE_CLASSES = ["climate-card--warmer", "climate-card--cooler", "climate-card--normal"];
+const BEST_DAY_IDEAL_TEMP = 24;
 
 function showState(state: "loading" | "error" | "content"): void {
   els.stateLoading.classList.toggle("state-panel--hidden", state !== "loading");
@@ -181,27 +204,25 @@ function setHeroCategory(category: Category): void {
 }
 
 function renderOutlook(daily: DailyEntry[]): void {
-  const entry = daily[OUTLOOK_DAY_OFFSET];
-  if (!entry) {
-    els.heroOutlookText.textContent = "";
-    return;
-  }
+  // Scan tomorrow through the end of the forecast for the first day with
+  // meaningful precipitation, rather than only checking a single fixed day.
+  const upcoming = daily.slice(1);
+  const rainyDay = upcoming.find((entry) => entry.precipitationProbability >= OUTLOOK_MIN_PROBABILITY);
 
-  const info = describeWeatherCode(entry.weatherCode);
-  const weekday = formatWeekday(entry.date);
-  const prob = entry.precipitationProbability;
-
-  if (prob < OUTLOOK_MIN_PROBABILITY) {
+  if (!rainyDay) {
     els.heroOutlookIcon.innerHTML = weatherIcon("clear");
-    els.heroOutlookText.textContent = `در ${weekday} (۴ روز دیگر) بارشی پیش‌بینی نمی‌شود.`;
+    els.heroOutlookText.textContent = "تا یک هفته آینده بارشی پیش‌بینی نمی‌شود.";
     return;
   }
 
+  const info = describeWeatherCode(rainyDay.weatherCode);
+  const weekday = formatWeekday(rainyDay.date);
+  const prob = rainyDay.precipitationProbability;
   const precipWord =
     info.category === "snow" ? "برف" : info.category === "rain" || info.category === "storm" ? "باران" : "بارش";
 
   els.heroOutlookIcon.innerHTML = weatherIcon(info.icon);
-  els.heroOutlookText.textContent = `احتمال ${precipWord} در ${weekday} (۴ روز دیگر): ${prob}٪`;
+  els.heroOutlookText.textContent = `${weekday}: احتمال بارش ${precipWord} (${prob}٪)`;
 }
 
 function renderAqi(airQuality: AirQuality | null): void {
@@ -222,21 +243,38 @@ function renderAqi(airQuality: AirQuality | null): void {
 function renderCharts(hourly: HourlyEntry[], daily: DailyEntry[]): void {
   if (hourly.length > 0) {
     const hourlyLabels = hourly.map((h) => formatTime(h.time));
+    const temps = hourly.map((h) => h.temperature);
     els.hourlyChart.innerHTML = buildLineChart(
-      [{ values: hourly.map((h) => h.temperature), colorVar: "--color-primary" }],
-      hourlyLabels
+      [{ values: temps, colorVar: "--color-primary" }],
+      hourlyLabels,
+      { maxLabels: 8 }
     );
+
+    const hottestIdx = temps.indexOf(Math.max(...temps));
+    const coldestIdx = temps.indexOf(Math.min(...temps));
+    els.hourlyChartCaption.textContent =
+      `گرم‌ترین ساعت: ${formatTime(hourly[hottestIdx].time)} (${Math.round(temps[hottestIdx])}°) ` +
+      `· سردترین ساعت: ${formatTime(hourly[coldestIdx].time)} (${Math.round(temps[coldestIdx])}°)`;
   }
 
   if (daily.length > 0) {
     const dailyLabels = daily.map((d) => formatWeekday(d.date));
+    const maxTemps = daily.map((d) => d.temperatureMax);
+    const minTemps = daily.map((d) => d.temperatureMin);
     els.dailyChart.innerHTML = buildLineChart(
       [
-        { values: daily.map((d) => d.temperatureMax), colorVar: "--color-accent" },
-        { values: daily.map((d) => d.temperatureMin), colorVar: "--color-primary" },
+        { values: maxTemps, colorVar: "--color-accent" },
+        { values: minTemps, colorVar: "--color-primary" },
       ],
-      dailyLabels
+      dailyLabels,
+      { maxOf: 0, minOf: 1 }
     );
+
+    const hottestDayIdx = maxTemps.indexOf(Math.max(...maxTemps));
+    const coldestDayIdx = minTemps.indexOf(Math.min(...minTemps));
+    els.dailyChartCaption.textContent =
+      `گرم‌ترین روز: ${formatWeekday(daily[hottestDayIdx].date)} (${Math.round(maxTemps[hottestDayIdx])}°) ` +
+      `· سردترین شب: ${formatWeekday(daily[coldestDayIdx].date)} (${Math.round(minTemps[coldestDayIdx])}°)`;
   }
 }
 
@@ -258,11 +296,87 @@ function renderHero(data: WeatherResponse): void {
   els.heroTip.textContent = conditionTip({
     category: info.category,
     temperature: current.temperature,
-    uvIndex: current.uvIndex,
     windSpeed: current.windSpeed,
   });
 
+  els.heroMascot.innerHTML = mascotSvg(info.category);
+
   renderOutlook(data.daily);
+  renderDayLength(data.daily);
+}
+
+/** Day length today vs. tomorrow — a small "getting longer/shorter" note using only sunrise/sunset already in hand. */
+function renderDayLength(daily: DailyEntry[]): void {
+  const today = daily[0];
+  const tomorrow = daily[1];
+  if (!today) {
+    els.heroDaylength.textContent = "";
+    return;
+  }
+
+  const lengthMinutes = (sunrise: string, sunset: string) =>
+    Math.round((new Date(sunset).getTime() - new Date(sunrise).getTime()) / 60000);
+
+  const todayLength = lengthMinutes(today.sunrise, today.sunset);
+  const hours = Math.floor(todayLength / 60);
+  const minutes = todayLength % 60;
+  let text = `طول روز امروز: ${hours} ساعت و ${minutes} دقیقه`;
+
+  if (tomorrow) {
+    const tomorrowLength = lengthMinutes(tomorrow.sunrise, tomorrow.sunset);
+    const diff = tomorrowLength - todayLength;
+    if (diff > 0) text += ` (در حال بلندتر شدن، ${diff} دقیقه در روز)`;
+    else if (diff < 0) text += ` (در حال کوتاه‌تر شدن، ${Math.abs(diff)} دقیقه در روز)`;
+  }
+
+  els.heroDaylength.textContent = text;
+}
+
+function renderClimateComparison(comparison: ClimateComparison | null): void {
+  if (!comparison) {
+    els.climateCard.classList.add("state-panel--hidden");
+    return;
+  }
+
+  els.climateCard.classList.remove("state-panel--hidden");
+  els.climateCard.classList.remove(...CLIMATE_CLASSES);
+
+  const diff = comparison.diffFromAvgMax;
+  if (Math.abs(diff) < 1) {
+    els.climateCard.classList.add("climate-card--normal");
+    els.climateText.textContent = `نزدیک به میانگین معمول (میانگین: ${comparison.avgMax}°)`;
+  } else if (diff > 0) {
+    els.climateCard.classList.add("climate-card--warmer");
+    els.climateText.textContent = `${diff.toFixed(1)}° گرم‌تر از معمول (میانگین: ${comparison.avgMax}°)`;
+  } else {
+    els.climateCard.classList.add("climate-card--cooler");
+    els.climateText.textContent = `${Math.abs(diff).toFixed(1)}° خنک‌تر از معمول (میانگین: ${comparison.avgMax}°)`;
+  }
+}
+
+/** Simple comfort score across the week: mild temperature, low rain chance, low wind. */
+function renderBestDay(daily: DailyEntry[]): void {
+  if (daily.length === 0) {
+    els.bestDayCallout.textContent = "";
+    return;
+  }
+
+  let bestIndex = 0;
+  let bestScore = -Infinity;
+
+  daily.forEach((entry, i) => {
+    const tempPenalty = Math.abs(entry.temperatureMax - BEST_DAY_IDEAL_TEMP);
+    const score = -tempPenalty - entry.precipitationProbability * 0.3 - entry.windSpeedMax * 0.15;
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = i;
+    }
+  });
+
+  const best = daily[bestIndex];
+  els.bestDayCallout.textContent =
+    `☀️ بهترین روز این هفته برای بیرون رفتن: ${formatWeekday(best.date)} ` +
+    `(${Math.round(best.temperatureMax)}°، احتمال بارش ${best.precipitationProbability}٪)`;
 }
 
 function renderDetails(data: WeatherResponse): void {
@@ -333,10 +447,12 @@ function renderDaily(daily: DailyEntry[]): void {
 function renderWeather(data: WeatherResponse): void {
   renderHero(data);
   renderAqi(data.airQuality);
+  renderClimateComparison(data.climateComparison);
   renderDetails(data);
   renderHourly(data.hourly);
   renderDaily(data.daily);
   renderCharts(data.hourly, data.daily);
+  renderBestDay(data.daily);
   showState("content");
 }
 
@@ -403,6 +519,41 @@ function renderQuickCities(): void {
   }
 }
 
+function renderHeatmap(cities: CityExtreme[]): void {
+  if (cities.length === 0) return;
+
+  const temps = cities.map((c) => c.temperature);
+  const min = Math.min(...temps);
+  const max = Math.max(...temps);
+
+  els.heatmap.innerHTML = cities
+    .map((city) => {
+      const color = heatColor(city.temperature, min, max);
+      return `
+        <div class="heatmap__cell" style="background:${color}">
+          <span class="heatmap__cell-name">${city.name}</span>
+          <span class="heatmap__cell-temp">${Math.round(city.temperature)}°</span>
+        </div>`;
+    })
+    .join("");
+
+  const avgTemp = temps.reduce((a, b) => a + b, 0) / temps.length;
+  let rainCount = 0;
+  let snowCount = 0;
+  for (const city of cities) {
+    const category = describeWeatherCode(city.weatherCode).category;
+    if (category === "rain" || category === "storm") rainCount++;
+    else if (category === "snow") snowCount++;
+  }
+
+  const parts = [`میانگین دمای ${cities.length} استان کشور: ${avgTemp.toFixed(1)}°`];
+  if (rainCount > 0) parts.push(`${rainCount} استان بارش باران دارند`);
+  if (snowCount > 0) parts.push(`${snowCount} استان بارش برف دارند`);
+  if (rainCount === 0 && snowCount === 0) parts.push("در حال حاضر بارشی در کشور گزارش نشده است");
+
+  els.heatmapAnalysis.textContent = parts.join(" · ");
+}
+
 async function loadHighlights(): Promise<void> {
   try {
     const response = await fetch("/api/highlights");
@@ -416,6 +567,9 @@ async function loadHighlights(): Promise<void> {
     if (data.coldest) {
       els.extremeColdCity.textContent = data.coldest.name;
       els.extremeColdTemp.textContent = `${Math.round(data.coldest.temperature)}°`;
+    }
+    if (data.cities?.length > 0) {
+      renderHeatmap(data.cities);
     }
     if (data.hottest || data.coldest) {
       els.extremes.classList.remove("state-panel--hidden");

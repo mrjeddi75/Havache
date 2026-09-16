@@ -576,7 +576,48 @@ body {
   display: block;
 }
 
-/* ---------- Air quality ---------- */
+/* ---------- Mascot + hero extras ---------- */
+
+.hero__tip-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.hero__mascot {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.hero__mascot svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.hero__tip-row .hero__tip {
+  margin: 0;
+}
+
+.hero__daylength {
+  margin: var(--space-1) 0 0;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+/* ---------- Air quality + climate comparison ---------- */
+
+.mini-cards {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.mini-cards > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
 
 .aqi-card {
   display: flex;
@@ -645,6 +686,44 @@ body {
   display: none;
 }
 
+.climate-card {
+  display: flex;
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+
+.climate-card__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.climate-card__label {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.climate-card__text {
+  font-weight: 700;
+  color: var(--color-primary-deep);
+  font-size: 0.95rem;
+}
+
+.climate-card--warmer {
+  border-inline-start: 4px solid #d9531e;
+}
+
+.climate-card--cooler {
+  border-inline-start: 4px solid #1e6fd9;
+}
+
+.climate-card--normal {
+  border-inline-start: 4px solid #4caf50;
+}
+
 /* ---------- Charts ---------- */
 
 .chart-container {
@@ -654,9 +733,62 @@ body {
 
 .line-chart__svg {
   width: 100%;
-  height: 110px;
+  height: 150px;
   display: block;
   min-width: 280px;
+}
+
+.chart-caption {
+  margin: 0 0 var(--space-2);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.chart-legend {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.chart-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.chart-legend__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.chart-legend__dot--max {
+  background: var(--color-accent);
+}
+
+.chart-legend__dot--min {
+  background: var(--color-primary);
+}
+
+.best-day-callout {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--cat-sunny-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-primary-deep);
+  text-align: center;
+}
+
+.best-day-callout:empty {
+  display: none;
 }
 
 /* ---------- Details grid ---------- */
@@ -1026,6 +1158,55 @@ body {
   font-weight: 700;
 }
 
+.heatmap__title {
+  margin: var(--space-4) 0 var(--space-3);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-primary-deep);
+  text-align: center;
+}
+
+.heatmap {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 6px;
+}
+
+.heatmap__cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: 10px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.heatmap__cell-name {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.heatmap__cell-temp {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.heatmap__analysis {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  text-align: center;
+  line-height: 1.7;
+}
+
 /* ---------- Footer ---------- */
 
 .app-footer {
@@ -1206,6 +1387,18 @@ body {
 
   .search__button {
     padding: 0 14px;
+  }
+
+  .mini-cards {
+    flex-direction: column;
+  }
+
+  .heatmap {
+    grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+  }
+
+  .heatmap__cell-name {
+    font-size: 0.62rem;
   }
 
   .details-grid {

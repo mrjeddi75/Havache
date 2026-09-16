@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import type {
   AirQuality,
   ApiErrorBody,
+  ClimateComparison,
   CurrentWeather,
   DailyEntry,
   GeocodeSuggestion,
@@ -15,6 +16,7 @@ const router = Router();
 const GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
 const AIR_QUALITY_URL = "https://air-quality-api.open-meteo.com/v1/air-quality";
+const ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive";
 
 /**
  * Open-Meteo is free and keyless for the endpoints this app uses.
@@ -26,6 +28,11 @@ const WEATHER_API_KEY = process.env.WEATHER_API_KEY ?? "";
 
 const WEATHER_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const weatherCache = new TtlCache<WeatherResponse>(WEATHER_CACHE_TTL_MS);
+
+// Historical averages barely change within a day — cache generously.
+const CLIMATE_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const climateCache = new TtlCache<ClimateComparison | null>(CLIMATE_CACHE_TTL_MS);
+const CLIMATE_YEARS_BACK = 10;
 
 interface OpenMeteoGeocodeResponse {
   results?: Array<{
@@ -76,6 +83,14 @@ interface OpenMeteoAirQualityResponse {
     us_aqi?: number;
     pm2_5?: number;
     pm10?: number;
+  };
+}
+
+interface OpenMeteoArchiveResponse {
+  daily?: {
+    time: string[];
+    temperature_2m_max: (number | null)[];
+    temperature_2m_min: (number | null)[];
   };
 }
 
@@ -191,6 +206,89 @@ async function fetchAirQuality(location: GeocodeSuggestion): Promise<AirQuality 
   }
 }
 
+function toIsoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Compares today's forecast high against the historical average high for
+ * this same calendar date over the past ~10 years, using Open-Meteo's
+ * free Historical Weather (archive) API. One request spans the whole
+ * 10-year window and the matching calendar day is filtered out
+ * client-side (server-side, technically) — far cheaper than one request
+ * per year.
+ */
+async function fetchClimateComparison(
+  location: GeocodeSuggestion,
+  todayMax: number
+): Promise<ClimateComparison | null> {
+  try {
+    const today = new Date();
+    const monthDay = toIsoDate(today).slice(5); // "MM-DD"
+
+    const startDate = new Date(today);
+    startDate.setFullYear(today.getFullYear() - CLIMATE_YEARS_BACK);
+    const endDate = new Date(today);
+    endDate.setDate(endDate.getDate() - 1); // archive API doesn't include today
+
+    const cacheKey = `${location.latitude.toFixed(2)},${location.longitude.toFixed(2)},${monthDay}`;
+    const cached = climateCache.get(cacheKey);
+    if (cached !== undefined) return cached;
+
+    const url = new URL(ARCHIVE_URL);
+    url.searchParams.set("latitude", String(location.latitude));
+    url.searchParams.set("longitude", String(location.longitude));
+    url.searchParams.set("start_date", toIsoDate(startDate));
+    url.searchParams.set("end_date", toIsoDate(endDate));
+    url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min");
+    url.searchParams.set("timezone", location.timezone);
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      climateCache.set(cacheKey, null);
+      return null;
+    }
+
+    const data = (await response.json()) as OpenMeteoArchiveResponse;
+    const daily = data.daily;
+    if (!daily) {
+      climateCache.set(cacheKey, null);
+      return null;
+    }
+
+    const maxes: number[] = [];
+    const mins: number[] = [];
+    daily.time.forEach((date, i) => {
+      if (!date.endsWith(monthDay)) return;
+      const max = daily.temperature_2m_max[i];
+      const min = daily.temperature_2m_min[i];
+      if (max !== null && max !== undefined) maxes.push(max);
+      if (min !== null && min !== undefined) mins.push(min);
+    });
+
+    if (maxes.length === 0) {
+      climateCache.set(cacheKey, null);
+      return null;
+    }
+
+    const avgMax = maxes.reduce((a, b) => a + b, 0) / maxes.length;
+    const avgMin = mins.length > 0 ? mins.reduce((a, b) => a + b, 0) / mins.length : avgMax;
+
+    const result: ClimateComparison = {
+      avgMax: Math.round(avgMax * 10) / 10,
+      avgMin: Math.round(avgMin * 10) / 10,
+      diffFromAvgMax: Math.round((todayMax - avgMax) * 10) / 10,
+      yearsUsed: maxes.length,
+    };
+
+    climateCache.set(cacheKey, result);
+    return result;
+  } catch (err) {
+    console.error("Climate comparison lookup failed:", err);
+    return null;
+  }
+}
+
 function buildCurrent(raw: OpenMeteoForecastResponse): CurrentWeather {
   const c = raw.current;
   return {
@@ -292,6 +390,9 @@ router.get("/weather", async (req: Request, res: Response) => {
     }
 
     const [raw, airQuality] = await Promise.all([fetchForecast(location), fetchAirQuality(location)]);
+    const daily = buildDaily(raw);
+    const todayMax = daily[0]?.temperatureMax ?? raw.current.temperature_2m;
+    const climateComparison = await fetchClimateComparison(location, todayMax);
 
     const payload: WeatherResponse = {
       location: {
@@ -302,8 +403,9 @@ router.get("/weather", async (req: Request, res: Response) => {
       },
       current: buildCurrent(raw),
       hourly: buildHourly(raw),
-      daily: buildDaily(raw),
+      daily,
       airQuality,
+      climateComparison,
       fetchedAt: new Date().toISOString(),
     };
 

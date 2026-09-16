@@ -108,25 +108,38 @@
             <div class="hero__updated">
               به‌روزرسانی: <span id="hero-updated"></span>
             </div>
-            <p class="hero__tip" id="hero-tip"></p>
+            <div class="hero__tip-row">
+              <div class="hero__mascot" id="hero-mascot" aria-hidden="true"></div>
+              <p class="hero__tip" id="hero-tip"></p>
+            </div>
             <p class="hero__outlook" id="hero-outlook">
               <span class="hero__outlook-icon" id="hero-outlook-icon" aria-hidden="true"></span>
               <span id="hero-outlook-text"></span>
             </p>
+            <p class="hero__daylength" id="hero-daylength"></p>
           </div>
         </section>
 
-        <!-- Air quality -->
-        <section class="aqi-card fade-in" id="aqi-card" aria-label="کیفیت هوا">
-          <div class="aqi-card__info">
-            <span class="aqi-card__label">کیفیت هوا</span>
-            <span class="aqi-card__category" id="aqi-category">--</span>
-          </div>
-          <div class="aqi-card__value">
-            <span class="aqi-card__number" id="aqi-number">--</span>
-            <span class="aqi-card__unit">AQI</span>
-          </div>
-        </section>
+        <!-- Air quality + climate comparison -->
+        <div class="mini-cards fade-in">
+          <section class="aqi-card" id="aqi-card" aria-label="کیفیت هوا">
+            <div class="aqi-card__info">
+              <span class="aqi-card__label">کیفیت هوا</span>
+              <span class="aqi-card__category" id="aqi-category">--</span>
+            </div>
+            <div class="aqi-card__value">
+              <span class="aqi-card__number" id="aqi-number">--</span>
+              <span class="aqi-card__unit">AQI</span>
+            </div>
+          </section>
+
+          <section class="climate-card state-panel--hidden" id="climate-card" aria-label="مقایسه با میانگین چند ساله">
+            <div class="climate-card__info">
+              <span class="climate-card__label">نسبت به میانگین ۱۰ سال اخیر</span>
+              <span class="climate-card__text" id="climate-text">--</span>
+            </div>
+          </section>
+        </div>
 
         <!-- Details grid -->
         <section class="details-grid fade-in" aria-label="جزئیات آب‌وهوا">
@@ -175,12 +188,19 @@
           </div>
           <div class="hourly-rail" id="hourly-rail" tabindex="0" aria-label="فهرست ساعتی، قابل پیمایش افقی"></div>
           <div class="chart-container" id="hourly-chart" aria-hidden="true"></div>
+          <p class="chart-caption" id="hourly-chart-caption"></p>
         </section>
 
         <!-- Daily forecast -->
         <section class="panel fade-in" aria-label="پیش‌بینی هفتگی">
           <h2 class="panel__title">پیش‌بینی ۷ روز آینده</h2>
+          <p class="best-day-callout" id="best-day-callout"></p>
           <div class="chart-container" id="daily-chart" aria-hidden="true"></div>
+          <div class="chart-legend">
+            <span class="chart-legend__item"><span class="chart-legend__dot chart-legend__dot--max"></span>بیشینه</span>
+            <span class="chart-legend__item"><span class="chart-legend__dot chart-legend__dot--min"></span>کمینه</span>
+          </div>
+          <p class="chart-caption" id="daily-chart-caption"></p>
           <ul class="daily-list" id="daily-list"></ul>
         </section>
       </section>
@@ -202,6 +222,10 @@
             <span class="extreme-card__temp" id="extreme-cold-temp">--°</span>
           </div>
         </div>
+
+        <h3 class="heatmap__title">نقشه‌ی حرارتی کشور</h3>
+        <div class="heatmap" id="heatmap" aria-label="دمای لحظه‌ای مراکز استان‌ها"></div>
+        <p class="heatmap__analysis" id="heatmap-analysis"></p>
       </section>
     </main>
 

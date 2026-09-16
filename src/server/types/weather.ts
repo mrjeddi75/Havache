@@ -54,6 +54,13 @@ export interface AirQuality {
   category: string;
 }
 
+export interface ClimateComparison {
+  avgMax: number;
+  avgMin: number;
+  diffFromAvgMax: number;
+  yearsUsed: number;
+}
+
 export interface WeatherResponse {
   location: {
     name: string;
@@ -65,6 +72,7 @@ export interface WeatherResponse {
   hourly: HourlyEntry[];
   daily: DailyEntry[];
   airQuality: AirQuality | null;
+  climateComparison: ClimateComparison | null;
   fetchedAt: string;
 }
 
