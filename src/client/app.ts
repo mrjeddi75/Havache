@@ -4,9 +4,9 @@ import { cityIconSvg } from "./cityIcons.js";
 import { CITIES } from "../shared/cities.js";
 import { initTheme, toggleTheme } from "./theme.js";
 import { classifyAqi } from "./aqi.js";
-import { buildLineChart } from "./chart.js";
 import { mascotSvg } from "./mascot.js";
 import { heatColor } from "./heatColor.js";
+import { windCompassSvg } from "./windCompass.js";
 
 interface CurrentWeather {
   temperature: number;
@@ -27,6 +27,7 @@ interface HourlyEntry {
   temperature: number;
   weatherCode: number;
   precipitationProbability: number;
+  precipitation: number;
   isDay: boolean;
 }
 
@@ -36,6 +37,7 @@ interface DailyEntry {
   temperatureMax: number;
   temperatureMin: number;
   precipitationProbability: number;
+  precipitationSum: number;
   sunrise: string;
   sunset: string;
   uvIndexMax: number;
@@ -100,6 +102,8 @@ interface HighlightsResponse {
 
 const DEFAULT_CITY = "تبریز";
 const WINDY_THRESHOLD_KMH = 35;
+const FROST_THRESHOLD_C = 0;
+const RAIN_WINDOW_MIN_PROBABILITY = 50;
 const OUTLOOK_MIN_PROBABILITY = 10;
 const SUGGESTIONS_DEBOUNCE_MS = 250;
 const SUGGESTIONS_MIN_LENGTH = 2;
@@ -141,24 +145,23 @@ const els = {
   climateText: document.getElementById("climate-text") as HTMLElement,
 
   bestDayCallout: document.getElementById("best-day-callout") as HTMLElement,
+  weeklyPrecip: document.getElementById("weekly-precip") as HTMLElement,
 
   detailHumidity: document.getElementById("detail-humidity") as HTMLElement,
   detailWind: document.getElementById("detail-wind") as HTMLElement,
   detailWindDirection: document.getElementById("detail-wind-direction") as HTMLElement,
+  detailWindCompass: document.getElementById("detail-wind-compass") as HTMLElement,
   detailPressure: document.getElementById("detail-pressure") as HTMLElement,
   detailUv: document.getElementById("detail-uv") as HTMLElement,
   detailVisibility: document.getElementById("detail-visibility") as HTMLElement,
   detailSunrise: document.getElementById("detail-sunrise") as HTMLElement,
   detailSunset: document.getElementById("detail-sunset") as HTMLElement,
 
-  hourlyRail: document.getElementById("hourly-rail") as HTMLElement,
-  hourlyChart: document.getElementById("hourly-chart") as HTMLElement,
+  hourlyList: document.getElementById("hourly-list") as HTMLUListElement,
   hourlyChartCaption: document.getElementById("hourly-chart-caption") as HTMLElement,
-  scrollLeft: document.getElementById("hourly-scroll-left") as HTMLButtonElement,
-  scrollRight: document.getElementById("hourly-scroll-right") as HTMLButtonElement,
+  todayRainWindow: document.getElementById("today-rain-window") as HTMLElement,
 
   dailyList: document.getElementById("daily-list") as HTMLUListElement,
-  dailyChart: document.getElementById("daily-chart") as HTMLElement,
   dailyChartCaption: document.getElementById("daily-chart-caption") as HTMLElement,
 
   extremes: document.getElementById("extremes") as HTMLElement,
@@ -240,16 +243,9 @@ function renderAqi(airQuality: AirQuality | null): void {
   els.aqiNumber.textContent = String(Math.round(airQuality.usAqi));
 }
 
-function renderCharts(hourly: HourlyEntry[], daily: DailyEntry[]): void {
+function renderTempSummaries(hourly: HourlyEntry[], daily: DailyEntry[]): void {
   if (hourly.length > 0) {
-    const hourlyLabels = hourly.map((h) => formatTime(h.time));
     const temps = hourly.map((h) => h.temperature);
-    els.hourlyChart.innerHTML = buildLineChart(
-      [{ values: temps, colorVar: "--color-primary" }],
-      hourlyLabels,
-      { maxLabels: 8 }
-    );
-
     const hottestIdx = temps.indexOf(Math.max(...temps));
     const coldestIdx = temps.indexOf(Math.min(...temps));
     els.hourlyChartCaption.textContent =
@@ -258,18 +254,8 @@ function renderCharts(hourly: HourlyEntry[], daily: DailyEntry[]): void {
   }
 
   if (daily.length > 0) {
-    const dailyLabels = daily.map((d) => formatWeekday(d.date));
     const maxTemps = daily.map((d) => d.temperatureMax);
     const minTemps = daily.map((d) => d.temperatureMin);
-    els.dailyChart.innerHTML = buildLineChart(
-      [
-        { values: maxTemps, colorVar: "--color-accent" },
-        { values: minTemps, colorVar: "--color-primary" },
-      ],
-      dailyLabels,
-      { maxOf: 0, minOf: 1 }
-    );
-
     const hottestDayIdx = maxTemps.indexOf(Math.max(...maxTemps));
     const coldestDayIdx = minTemps.indexOf(Math.min(...minTemps));
     els.dailyChartCaption.textContent =
@@ -386,6 +372,7 @@ function renderDetails(data: WeatherResponse): void {
   els.detailHumidity.textContent = `${current.humidity}٪`;
   els.detailWind.textContent = `${Math.round(current.windSpeed)} کیلومتر/ساعت`;
   els.detailWindDirection.textContent = windDirectionLabel(current.windDirection);
+  els.detailWindCompass.innerHTML = windCompassSvg(current.windDirection);
   els.detailPressure.textContent = `${Math.round(current.pressure)} هکتوپاسکال`;
   els.detailUv.textContent = current.uvIndex.toFixed(1);
   els.detailVisibility.textContent = current.visibility
@@ -398,33 +385,87 @@ function renderDetails(data: WeatherResponse): void {
   }
 }
 
+function renderWeeklyPrecip(daily: DailyEntry[]): void {
+  if (daily.length === 0) {
+    els.weeklyPrecip.textContent = "";
+    return;
+  }
+  const total = daily.reduce((sum, d) => sum + d.precipitationSum, 0);
+  if (total < 0.1) {
+    els.weeklyPrecip.textContent = "🌤 بارشی برای این هفته پیش‌بینی نمی‌شود.";
+    return;
+  }
+  els.weeklyPrecip.textContent = `🌧 بارش تخمینی این هفته: ${total.toFixed(1)} میلی‌متر`;
+}
+
+/** First/last hour today with meaningful precipitation, from the hourly forecast already on hand. */
+function renderTodayRainWindow(hourly: HourlyEntry[], daily: DailyEntry[]): void {
+  const todayDate = daily[0]?.date;
+  if (!todayDate) {
+    els.todayRainWindow.textContent = "";
+    return;
+  }
+
+  const todayHours = hourly.filter((h) => h.time.startsWith(todayDate));
+  const rainingHours = todayHours.filter(
+    (h) => h.precipitation > 0.1 || h.precipitationProbability >= RAIN_WINDOW_MIN_PROBABILITY
+  );
+
+  if (rainingHours.length === 0) {
+    els.todayRainWindow.textContent = "";
+    return;
+  }
+
+  const start = formatTime(rainingHours[0].time);
+  const end = formatTime(rainingHours[rainingHours.length - 1].time);
+  els.todayRainWindow.textContent =
+    start === end
+      ? `☔ بارش امروز حدود ساعت ${start} پیش‌بینی می‌شود.`
+      : `☔ بارش امروز حدود از ساعت ${start} تا ${end} پیش‌بینی می‌شود.`;
+}
+
 function renderHourly(hourly: HourlyEntry[]): void {
-  els.hourlyRail.innerHTML = "";
+  els.hourlyList.innerHTML = "";
+  if (hourly.length === 0) return;
+
+  const temps = hourly.map((h) => h.temperature);
+  const minTemp = Math.min(...temps);
+  const maxTemp = Math.max(...temps);
 
   for (const entry of hourly) {
     const info = describeWeatherCode(entry.weatherCode);
-    const card = document.createElement("div");
-    card.className = `hour-card hour-card--${info.category}`;
-    card.innerHTML = `
-      <span class="hour-card__time">${formatTime(entry.time)}</span>
-      <span class="hour-card__icon">${weatherIcon(info.icon)}</span>
-      <span class="hour-card__temp">${Math.round(entry.temperature)}°</span>
-      <span class="hour-card__precip">${entry.precipitationProbability}٪ بارش</span>
+    const barColor = heatColor(entry.temperature, minTemp, maxTemp);
+    const li = document.createElement("li");
+    li.className = `hour-row hour-row--${info.category}`;
+    li.innerHTML = `
+      <span class="heat-bar" style="background:${barColor}" aria-hidden="true"></span>
+      <span class="hour-row__time">${formatTime(entry.time)}</span>
+      <span class="hour-row__icon">${weatherIcon(info.icon)}</span>
+      <span class="hour-row__condition">${info.label} · ${entry.precipitationProbability}٪ بارش</span>
+      <span class="hour-row__temp">${Math.round(entry.temperature)}°</span>
     `;
-    els.hourlyRail.appendChild(card);
+    els.hourlyList.appendChild(li);
   }
 }
 
 function renderDaily(daily: DailyEntry[]): void {
   els.dailyList.innerHTML = "";
+  if (daily.length === 0) return;
+
+  const maxTemps = daily.map((d) => d.temperatureMax);
+  const weekMin = Math.min(...maxTemps);
+  const weekMax = Math.max(...maxTemps);
 
   for (const entry of daily) {
     const info = describeWeatherCode(entry.weatherCode);
     const isWindy = entry.windSpeedMax >= WINDY_THRESHOLD_KMH;
+    const isFrost = entry.temperatureMin < FROST_THRESHOLD_C;
+    const barColor = heatColor(entry.temperatureMax, weekMin, weekMax);
 
     const li = document.createElement("li");
     li.className = `daily-row daily-row--${info.category}`;
     li.innerHTML = `
+      <span class="heat-bar" style="background:${barColor}" aria-hidden="true"></span>
       <span class="daily-row__day">${formatWeekday(entry.date)}</span>
       <span class="daily-row__icon">${weatherIcon(info.icon)}</span>
       <span class="daily-row__condition">
@@ -434,6 +475,7 @@ function renderDaily(daily: DailyEntry[]): void {
             ? `<span class="wind-badge" title="باد نسبتاً شدید">${windBadgeSvg()}<span>باد شدید</span></span>`
             : ""
         }
+        ${isFrost ? `<span class="frost-badge" title="احتمال یخبندان">❄️<span>یخبندان</span></span>` : ""}
       </span>
       <span class="daily-row__temps">
         <span class="daily-row__temp-max">${Math.round(entry.temperatureMax)}°</span>
@@ -451,8 +493,10 @@ function renderWeather(data: WeatherResponse): void {
   renderDetails(data);
   renderHourly(data.hourly);
   renderDaily(data.daily);
-  renderCharts(data.hourly, data.daily);
+  renderTempSummaries(data.hourly, data.daily);
   renderBestDay(data.daily);
+  renderWeeklyPrecip(data.daily);
+  renderTodayRainWindow(data.hourly, data.daily);
   showState("content");
 }
 
@@ -697,14 +741,6 @@ els.form.addEventListener("submit", (event) => {
 });
 
 els.themeToggle.addEventListener("click", toggleTheme);
-
-els.scrollRight.addEventListener("click", () => {
-  els.hourlyRail.scrollBy({ left: -240, behavior: "smooth" });
-});
-
-els.scrollLeft.addEventListener("click", () => {
-  els.hourlyRail.scrollBy({ left: 240, behavior: "smooth" });
-});
 
 els.quickCities.addEventListener("click", (event) => {
   const target = (event.target as HTMLElement).closest<HTMLButtonElement>(".city-card");

@@ -20,14 +20,15 @@ export interface BuildChartOptions {
 }
 
 /**
- * Builds a small, dependency-free SVG line chart with gridlines, x-axis
- * labels, and the peak/trough points called out with their value — a
- * bare polyline doesn't tell a general audience *when* it's hot or cold,
- * so every chart in this app is rendered through this function rather
- * than a plain line.
+ * Builds a small, dependency-free line chart. The SVG only draws
+ * geometry (gridlines, the line itself, and small dot markers) — every
+ * label (x-axis days/times, the peak/trough values) is real HTML laid
+ * on top at the same pixel coordinates, so text always renders in the
+ * page's own font rather than whatever font an <svg><text> element falls
+ * back to. Returns a ready-to-insert HTML string.
  */
 export function buildLineChart(series: ChartSeries[], xLabels: string[], options: BuildChartOptions = {}): string {
-  const height = options.height ?? 150;
+  const height = options.height ?? 104;
   const unit = options.unit ?? "°";
   const maxLabels = options.maxLabels ?? Math.min(xLabels.length, 8);
   const maxOfIndex = options.maxOf ?? 0;
@@ -37,9 +38,9 @@ export function buildLineChart(series: ChartSeries[], xLabels: string[], options
   if (pointCount === 0 || series.length === 0) return "";
 
   const width = Math.max(pointCount * 52, 280);
-  const paddingX = 22;
-  const paddingTop = 26; // room for the "hottest point" value label
-  const paddingBottom = 36; // room for x-axis labels + clearance from the "coldest point" value label
+  const paddingX = 10;
+  const paddingTop = 28; // room for a value label sitting above the point (e.g. the hottest day)
+  const paddingBottom = 10; // dots only need a little clearance at the bottom
   const plotHeight = height - paddingTop - paddingBottom;
 
   const allValues = series.flatMap((s) => s.values);
@@ -66,39 +67,54 @@ export function buildLineChart(series: ChartSeries[], xLabels: string[], options
     })
     .join("");
 
-  const labelStep = Math.max(1, Math.ceil(pointCount / maxLabels));
-  const xAxisLabels = xLabels
-    .map((label, i) => {
-      const isLast = i === pointCount - 1;
-      if (i % labelStep !== 0 && !isLast) return "";
-      return `<text x="${xAt(i).toFixed(1)}" y="${height - 8}" text-anchor="middle" font-size="11" style="fill:var(--color-text-muted)">${label}</text>`;
-    })
-    .join("");
-
-  function highlightPoint(seriesIndex: number, pickMax: boolean, colorVar: string): string {
+  function highlightDot(seriesIndex: number, pickMax: boolean, colorVar: string) {
     const values = series[seriesIndex]?.values;
-    if (!values || values.length === 0) return "";
+    if (!values || values.length === 0) return { dot: "", label: "" };
     const target = pickMax ? Math.max(...values) : Math.min(...values);
     const idx = values.indexOf(target);
     const x = xAt(idx);
     const y = yAt(target);
-    const axisTextTop = height - paddingBottom + 4; // where x-axis label text starts
-    const labelY = pickMax ? Math.max(y - 10, paddingTop - 6) : Math.min(y + 14, axisTextTop - 8);
-    return `
-      <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="var(${colorVar})" stroke="#fff" stroke-width="1.5"/>
-      <text x="${x.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="middle" font-size="12" font-weight="700" style="fill:var(${colorVar})">${Math.round(target)}${unit}</text>
-    `;
+    const xPercent = ((x / width) * 100).toFixed(2);
+    const dot = `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="var(${colorVar})" stroke="#fff" stroke-width="1.5"/>`;
+    const label = `<span class="chart-value-label" style="left:${xPercent}%;top:${y.toFixed(
+      1
+    )}px;color:var(${colorVar})">${Math.round(target)}${unit}</span>`;
+    return { dot, label };
   }
 
   const maxColorVar = series[maxOfIndex]?.colorVar ?? series[0].colorVar;
   const minColorVar = series[minOfIndex]?.colorVar ?? series[0].colorVar;
+  const maxHighlight = highlightDot(maxOfIndex, true, maxColorVar);
+  const minHighlight = highlightDot(minOfIndex, false, minColorVar);
 
-  const highlights = highlightPoint(maxOfIndex, true, maxColorVar) + highlightPoint(minOfIndex, false, minColorVar);
+  const labelStep = Math.max(1, Math.ceil(pointCount / maxLabels));
+  const axisLabels = xLabels
+    .map((label, i) => {
+      const isLast = i === pointCount - 1;
+      if (i % labelStep !== 0 && !isLast) return "";
+      const xPercent = ((xAt(i) / width) * 100).toFixed(2);
+      return `<span class="chart-axis-label" style="left:${xPercent}%">${label}</span>`;
+    })
+    .join("");
 
-  return `<svg class="line-chart__svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-    ${gridLines}
-    ${lines}
-    ${highlights}
-    ${xAxisLabels}
-  </svg>`;
+  // width is the natural/minimum pixel width (enough room per point to stay
+  // readable). CSS stretches these boxes to fill the container when it's
+  // wider than that floor, and falls back to horizontal scroll (via the
+  // parent .chart-container's overflow-x) only when it isn't. Label
+  // positions are percentages so they track the stretch exactly.
+  return `<div class="chart-plot" style="min-width:${width}px">
+    <div class="chart-plot__svg-wrap" style="min-width:${width}px;height:${height}px">
+      <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        ${gridLines}
+        ${lines}
+        ${maxHighlight.dot}
+        ${minHighlight.dot}
+      </svg>
+      ${maxHighlight.label}
+      ${minHighlight.label}
+    </div>
+    <div class="chart-axis-labels" style="min-width:${width}px">
+      ${axisLabels}
+    </div>
+  </div>`;
 }

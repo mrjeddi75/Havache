@@ -32,6 +32,7 @@ export interface HourlyEntry {
   temperature: number;
   weatherCode: number;
   precipitationProbability: number;
+  precipitation: number;
   isDay: boolean;
 }
 
@@ -41,6 +42,7 @@ export interface DailyEntry {
   temperatureMax: number;
   temperatureMin: number;
   precipitationProbability: number;
+  precipitationSum: number;
   sunrise: string;
   sunset: string;
   uvIndexMax: number;

@@ -6,6 +6,22 @@ and a 7-day forecast — all labeled in Persian, laid out right-to-left.
 
 ## What's new in this pass
 
+- **Charts removed, replaced with a color-spectrum indicator per row**:
+  both line charts are gone entirely. Instead, every row in the hourly
+  and weekly lists now has a small rounded color bar right before the
+  time/day (blue → yellow → red, scaled to that list's own min/max) so
+  the hottest and coldest points are visible at a glance without a
+  separate graph. The "hottest/coldest hour" and "hottest/coldest day"
+  text captions stayed — they were already independent of the chart
+  rendering, just useful quick-read summaries.
+- **Fixed the hourly/weekly panels rendering at very unequal widths on
+  desktop**: this was a classic CSS Grid gotcha — grid items don't
+  shrink below their content's intrinsic width by default, and the old
+  hourly chart's minimum width (sized for 24 data points) was forcing
+  its column much wider than its fair 50/50 share, squeezing the weekly
+  panel. Added `min-width: 0` to both panels so they now split the row
+  evenly regardless of content, and removing the charts eliminates the
+  oversized content that triggered it in the first place.
 - **Fixed the mobile search-bar bug**: the header previously combined
   `position: sticky` with `backdrop-filter`, a combination that some
   Android WebViews (common on budget/older phones) render incorrectly,
@@ -44,7 +60,55 @@ and a 7-day forecast — all labeled in Persian, laid out right-to-left.
   caption underneath ("گرم‌ترین ساعت: ۱۵:۰۰ (۲۸°) · سردترین ساعت: ۰۴:۰۰
   (۱۲°)") — a bare line didn't tell you *when* it's hot or cold, so now
   both the visual and the text say so explicitly.
-- **Three polish fixes on the charts and tips**:
+- **Visual redesign — minimal and cleaner, on mobile too**:
+  - Flat `border: 1px solid` on every card/panel/input replaced with a
+    soft two-layer shadow system (with its own dark-mode variant), so the
+    page reads as a set of calm, layered surfaces instead of boxed-in
+    tiles.
+  - Dropped the full-color category backgrounds on hourly cards and
+    daily rows — color now lives only in the icon (and a slim accent for
+    AQI/climate severity), not the whole card, which was making every
+    screen feel busy.
+  - Hottest/coldest cards went from a solid gradient fill to a neutral
+    card with colored text — same information, less visual noise.
+  - Bumped the base spacing scale and hero temperature size for a
+    stronger sense of hierarchy, with a separate (tighter) spacing pass
+    on mobile so the extra breathing room doesn't turn into extra
+    scrolling on small screens.
+  - **Hourly and 7-day charts now sit side by side on desktop**
+    (`min-width: 1024px`) and stack normally on tablet and mobile.
+  - **"Important info" moved to right under the weekly forecast**: a new
+    grouped card holds the best-day callout, weekly precipitation total,
+    and today's rain window (divided by thin separators instead of being
+    three separate colored pills), immediately followed by the
+    hottest/coldest + heatmap section.
+- **24-hour forecast now matches the weekly forecast's layout**: the
+  horizontal-scrolling hour cards (with their own scroll buttons) are
+  gone — hourly data now reads as the exact same row-list pattern as the
+  7-day forecast (time / icon / condition / temperature), just capped at
+  a fixed height with its own internal scroll so it stays roughly the
+  same height as the 7-row weekly list when the two sit side by side.
+  Icon sizes, row padding, hover state, and the mobile column layout are
+  now identical between the two lists — same component, different data.
+- **Chart text moved completely out of the SVG (font fix, for real this
+  time)**: rather than patching the font-family on `<svg><text>`
+  elements, every label — x-axis days/times and the peak/trough value
+  callouts — is now rendered as ordinary HTML `<span>`s absolutely
+  positioned over a text-free SVG (just lines, gridlines, and dot
+  markers). Since it's real HTML, it always inherits Vazirmatn from the
+  page; there's no SVG-text fallback-font path left to mismatch.
+- **Weekly precipitation total** — a pill above the 7-day chart sums
+  `precipitation_sum` across all 7 days ("🌧 بارش تخمینی این هفته: ۱۲.۳
+  میلی‌متر", or a plain "no rain expected" message for a dry week).
+- **Frost warning** — any day in the weekly list with a low temperature
+  below 0° gets a "❄️ یخبندان" badge, the same pattern as the existing
+  high-wind badge.
+- **Today's rain start/end window** — a caption under the hourly chart
+  uses the hourly `precipitation` amount (not just probability) to say
+  e.g. "☔ بارش امروز حدود از ساعت ۱۴:۰۰ تا ۱۸:۰۰ پیش‌بینی می‌شود."
+- **Wind compass** — a small SVG dial with a needle rotated to the
+  current wind direction sits next to the text label in the details
+  grid.
   - The coldest-point value label on a chart could land exactly on top of
     the x-axis day label when the lowest point fell at the very bottom of
     the plot (visible as "15°" overlapping "دوشنبه"). The label position
@@ -137,16 +201,15 @@ src/
     types/weather.ts                # Shared response/domain types
   client/
     index.html                # Page shell (RTL, Persian labels, ARIA)
-    styles.css                 # Theme (light/dark), layout, icon + chart + heatmap styling
-    app.ts                      # Fetch, render, autocomplete, charts, theme wiring
+    styles.css                 # Theme (light/dark), layout, icon + heatmap styling
+    app.ts                      # Fetch, render, autocomplete, theme wiring
     theme.ts                     # Dark-mode init/toggle (localStorage + system preference)
     aqi.ts                        # US AQI number -> Persian category + CSS class
-    chart.ts                       # Dependency-free inline SVG line chart builder
-    mascot.ts                       # هواچه mascot SVG, expression keyed by weather category
-    heatColor.ts                     # Blue->yellow->red color interpolation for the heatmap
-    weatherCodes.ts                   # WMO code -> Persian label, icon key, category, tip text
-    icons.ts                           # Animated inline SVG weather icon set + wind badge
-    cityIcons.ts                        # Custom pin-based SVG icons per city type
+    mascot.ts                      # هواچه mascot SVG, expression keyed by weather category
+    heatColor.ts                    # Blue->yellow->red interpolation (heatmap + row heat-bars)
+    weatherCodes.ts                  # WMO code -> Persian label, icon key, category, tip text
+    icons.ts                          # Animated inline SVG weather icon set + wind badge
+    cityIcons.ts                       # Custom pin-based SVG icons per city type
     favicon.svg                          # هواچه logo mark, used as favicon and header logo source
 public/                                  # Build output served statically (generated)
 scripts/copy-static.mjs                 # Copies static assets, content-hashes JS/CSS, rewrites HTML

@@ -151,9 +151,12 @@
             <span class="detail-card__label" title="سرعت وزش باد">سرعت باد</span>
             <span class="detail-card__value" id="detail-wind">-- کیلومتر/ساعت</span>
           </div>
-          <div class="detail-card">
+          <div class="detail-card detail-card--compass">
             <span class="detail-card__label" title="جهتی که باد از آن می‌وزد">جهت باد</span>
-            <span class="detail-card__value" id="detail-wind-direction">--</span>
+            <div class="detail-card__compass-row">
+              <span class="detail-card__compass-icon" id="detail-wind-compass"></span>
+              <span class="detail-card__value" id="detail-wind-direction">--</span>
+            </div>
           </div>
           <div class="detail-card">
             <span class="detail-card__label" title="فشار هوا در سطح دریا">فشار هوا</span>
@@ -177,31 +180,28 @@
           </div>
         </section>
 
-        <!-- Hourly forecast -->
-        <section class="panel fade-in" aria-label="پیش‌بینی ساعتی">
-          <div class="panel__header">
+        <!-- Hourly + daily forecasts (side by side on desktop, stacked below) -->
+        <div class="forecast-row">
+          <section class="panel fade-in" aria-label="پیش‌بینی ساعتی">
             <h2 class="panel__title">پیش‌بینی ۲۴ ساعت آینده</h2>
-            <div class="scroll-buttons">
-              <button type="button" class="scroll-button" id="hourly-scroll-right" aria-label="نمایش ساعات بعدی">‹</button>
-              <button type="button" class="scroll-button" id="hourly-scroll-left" aria-label="نمایش ساعات قبلی">›</button>
-            </div>
-          </div>
-          <div class="hourly-rail" id="hourly-rail" tabindex="0" aria-label="فهرست ساعتی، قابل پیمایش افقی"></div>
-          <div class="chart-container" id="hourly-chart" aria-hidden="true"></div>
-          <p class="chart-caption" id="hourly-chart-caption"></p>
-        </section>
+            <p class="chart-caption" id="hourly-chart-caption"></p>
+            <ul class="hourly-list" id="hourly-list" aria-label="فهرست ساعتی"></ul>
+          </section>
 
-        <!-- Daily forecast -->
-        <section class="panel fade-in" aria-label="پیش‌بینی هفتگی">
-          <h2 class="panel__title">پیش‌بینی ۷ روز آینده</h2>
-          <p class="best-day-callout" id="best-day-callout"></p>
-          <div class="chart-container" id="daily-chart" aria-hidden="true"></div>
-          <div class="chart-legend">
-            <span class="chart-legend__item"><span class="chart-legend__dot chart-legend__dot--max"></span>بیشینه</span>
-            <span class="chart-legend__item"><span class="chart-legend__dot chart-legend__dot--min"></span>کمینه</span>
+          <section class="panel fade-in" aria-label="پیش‌بینی هفتگی">
+            <h2 class="panel__title">پیش‌بینی ۷ روز آینده</h2>
+            <p class="chart-caption" id="daily-chart-caption"></p>
+            <ul class="daily-list" id="daily-list"></ul>
+          </section>
+        </div>
+
+        <!-- Important info, right under the weekly forecast -->
+        <section class="weekly-insights fade-in" aria-label="نکات مهم هفته">
+          <div class="insight-card">
+            <p class="best-day-callout" id="best-day-callout"></p>
+            <p class="weekly-precip" id="weekly-precip"></p>
+            <p class="chart-caption chart-caption--rain" id="today-rain-window"></p>
           </div>
-          <p class="chart-caption" id="daily-chart-caption"></p>
-          <ul class="daily-list" id="daily-list"></ul>
         </section>
       </section>
 

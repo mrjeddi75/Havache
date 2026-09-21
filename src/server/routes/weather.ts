@@ -63,6 +63,7 @@ interface OpenMeteoForecastResponse {
     temperature_2m: number[];
     weather_code: number[];
     precipitation_probability: number[];
+    precipitation: number[];
     is_day: number[];
   };
   daily: {
@@ -71,6 +72,7 @@ interface OpenMeteoForecastResponse {
     temperature_2m_max: number[];
     temperature_2m_min: number[];
     precipitation_probability_max: number[];
+    precipitation_sum: number[];
     sunrise: string[];
     sunset: string[];
     uv_index_max: number[];
@@ -145,7 +147,7 @@ async function fetchForecast(location: GeocodeSuggestion): Promise<OpenMeteoFore
   );
   url.searchParams.set(
     "hourly",
-    ["temperature_2m", "weather_code", "precipitation_probability", "is_day"].join(",")
+    ["temperature_2m", "weather_code", "precipitation_probability", "precipitation", "is_day"].join(",")
   );
   url.searchParams.set(
     "daily",
@@ -154,6 +156,7 @@ async function fetchForecast(location: GeocodeSuggestion): Promise<OpenMeteoFore
       "temperature_2m_max",
       "temperature_2m_min",
       "precipitation_probability_max",
+      "precipitation_sum",
       "sunrise",
       "sunset",
       "uv_index_max",
@@ -313,6 +316,7 @@ function buildHourly(raw: OpenMeteoForecastResponse): HourlyEntry[] {
     temperature: raw.hourly.temperature_2m[i],
     weatherCode: raw.hourly.weather_code[i],
     precipitationProbability: raw.hourly.precipitation_probability[i] ?? 0,
+    precipitation: raw.hourly.precipitation[i] ?? 0,
     isDay: raw.hourly.is_day[i] === 1,
   }));
 
@@ -327,6 +331,7 @@ function buildDaily(raw: OpenMeteoForecastResponse): DailyEntry[] {
     temperatureMax: raw.daily.temperature_2m_max[i],
     temperatureMin: raw.daily.temperature_2m_min[i],
     precipitationProbability: raw.daily.precipitation_probability_max[i] ?? 0,
+    precipitationSum: raw.daily.precipitation_sum[i] ?? 0,
     sunrise: raw.daily.sunrise[i],
     sunset: raw.daily.sunset[i],
     uvIndexMax: raw.daily.uv_index_max[i] ?? 0,
