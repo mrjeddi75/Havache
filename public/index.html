@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>هواچه | آب‌وهوای دقیق و ساده</title>
+  <meta name="description" content="هواچه؛ وضعیت آب‌وهوای هر شهر را به‌صورت لحظه‌ای، ساعتی و هفتگی، ساده و به فارسی ببینید." />
+  <meta name="theme-color" content="#1e6fd9" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link
+    href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="/styles.css?v=55f18205" />
+</head>
+<body>
+  <div class="page">
+    <header class="app-header">
+      <div class="app-header__brand">
+        <span class="app-header__logo" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 4a20 20 0 0 1 20 20c0 6-3 9-8 12l2 8-9-5c-9-1-15-7-15-15A20 20 0 0 1 8 4z" fill="#1E6FD9"/>
+            <circle cx="17" cy="17" r="6" fill="#F5A623"/>
+            <path d="M15 27a7 7 0 0 1 1-13.9A9 9 0 0 1 33.5 16H34a6 6 0 0 1 0 12H15z" fill="#ffffff"/>
+          </svg>
+        </span>
+        <div class="app-header__titles">
+          <h1 class="app-header__title">هواچه</h1>
+          <p class="app-header__subtitle">آب‌وهوای هر شهر، ساده و روشن</p>
+        </div>
+      </div>
+      <div class="app-header__controls">
+        <form class="search" id="search-form" role="search" aria-label="جست‌وجوی شهر">
+          <div class="search__field">
+            <label class="visually-hidden" for="city-input">نام شهر را وارد کنید</label>
+            <input
+              type="text"
+              id="city-input"
+              name="city"
+              class="search__input"
+              placeholder="نام شهر را وارد کنید، مثلاً تبریز"
+              autocomplete="off"
+              aria-describedby="search-status"
+              aria-expanded="false"
+              aria-controls="search-suggestions"
+              role="combobox"
+            />
+            <ul class="search__suggestions" id="search-suggestions" role="listbox"></ul>
+          </div>
+          <button type="submit" class="search__button">
+            <svg class="search__icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="2"/>
+              <path d="M20 20l-4.5-4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span class="search__label">جست‌وجو</span>
+          </button>
+        </form>
+        <button type="button" class="theme-toggle" id="theme-toggle" aria-label="تغییر به حالت شب">
+          <svg class="theme-toggle__icon theme-toggle__icon--moon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" fill="currentColor"/>
+          </svg>
+          <svg class="theme-toggle__icon theme-toggle__icon--sun" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="12" cy="12" r="4.5" fill="currentColor"/>
+            <g stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M12 2.5v2.5M12 19v2.5M21.5 12H19M5 12H2.5M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8M18.4 18.4l-1.8-1.8M7.4 7.4L5.6 5.6"/>
+            </g>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <section class="quick-cities" aria-label="شهرهای پرطرفدار">
+      <h2 class="visually-hidden">انتخاب سریع شهر</h2>
+      <div class="quick-cities__grid quick-cities__grid--collapsed" id="quick-cities"></div>
+      <button type="button" class="quick-cities__toggle" id="quick-cities-toggle" aria-expanded="false">
+        نمایش همه شهرها
+      </button>
+    </section>
+
+    <main class="app-main">
+      <p id="search-status" class="visually-hidden" role="status" aria-live="polite"></p>
+
+      <section id="state-loading" class="state-panel" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>در حال دریافت اطلاعات آب‌وهوا…</p>
+      </section>
+
+      <section id="state-error" class="state-panel state-panel--hidden state-panel--error" role="alert">
+        <p id="error-message"></p>
+      </section>
+
+      <section id="weather-content" class="weather-content state-panel--hidden">
+        <!-- Current conditions hero -->
+        <section class="hero fade-in" id="hero" aria-label="وضعیت فعلی آب‌وهوا">
+          <div class="hero__primary">
+            <div class="hero__icon" id="hero-icon" aria-hidden="true"></div>
+            <div class="hero__temp-block">
+              <div class="hero__temp" id="hero-temp">--°</div>
+              <div class="hero__condition" id="hero-condition"></div>
+            </div>
+          </div>
+          <div class="hero__meta">
+            <div class="hero__location" id="hero-location"></div>
+            <div class="hero__feels-like">
+              دمای احساس‌شده: <span id="hero-feels-like">--°</span>
+            </div>
+            <div class="hero__updated">
+              به‌روزرسانی: <span id="hero-updated"></span>
+            </div>
+            <div class="hero__tip-row">
+              <div class="hero__mascot" id="hero-mascot" aria-hidden="true"></div>
+              <p class="hero__tip" id="hero-tip"></p>
+            </div>
+            <p class="hero__outlook" id="hero-outlook">
+              <span class="hero__outlook-icon" id="hero-outlook-icon" aria-hidden="true"></span>
+              <span id="hero-outlook-text"></span>
+            </p>
+            <p class="hero__daylength" id="hero-daylength"></p>
+          </div>
+        </section>
+
+        <!-- Air quality + climate comparison -->
+        <div class="mini-cards fade-in">
+          <section class="aqi-card" id="aqi-card" aria-label="کیفیت هوا">
+            <div class="aqi-card__info">
+              <span class="aqi-card__label">کیفیت هوا</span>
+              <span class="aqi-card__category" id="aqi-category">--</span>
+            </div>
+            <div class="aqi-card__value">
+              <span class="aqi-card__number" id="aqi-number">--</span>
+              <span class="aqi-card__unit">AQI</span>
+            </div>
+          </section>
+
+          <section class="climate-card state-panel--hidden" id="climate-card" aria-label="مقایسه با میانگین چند ساله">
+            <div class="climate-card__info">
+              <span class="climate-card__label">نسبت به میانگین ۱۰ سال اخیر</span>
+              <span class="climate-card__text" id="climate-text">--</span>
+            </div>
+          </section>
+        </div>
+
+        <!-- Details grid -->
+        <section class="details-grid fade-in" aria-label="جزئیات آب‌وهوا">
+          <div class="detail-card">
+            <span class="detail-card__label" title="میزان رطوبت هوا">رطوبت</span>
+            <span class="detail-card__value" id="detail-humidity">--٪</span>
+          </div>
+          <div class="detail-card">
+            <span class="detail-card__label" title="سرعت وزش باد">سرعت باد</span>
+            <span class="detail-card__value" id="detail-wind">-- کیلومتر/ساعت</span>
+          </div>
+          <div class="detail-card detail-card--compass">
+            <span class="detail-card__label" title="جهتی که باد از آن می‌وزد">جهت باد</span>
+            <div class="detail-card__compass-row">
+              <span class="detail-card__compass-icon" id="detail-wind-compass"></span>
+              <span class="detail-card__value" id="detail-wind-direction">--</span>
+            </div>
+          </div>
+          <div class="detail-card">
+            <span class="detail-card__label" title="فشار هوا در سطح دریا">فشار هوا</span>
+            <span class="detail-card__value" id="detail-pressure">-- هکتوپاسکال</span>
+          </div>
+          <div class="detail-card">
+            <span class="detail-card__label" title="میزان تابش مضر خورشید؛ هرچه بیشتر، خطرناک‌تر">شاخص فرابنفش</span>
+            <span class="detail-card__value" id="detail-uv">--</span>
+          </div>
+          <div class="detail-card">
+            <span class="detail-card__label" title="حداکثر فاصله‌ای که به‌وضوح دیده می‌شود">دید افقی</span>
+            <span class="detail-card__value" id="detail-visibility">-- متر</span>
+          </div>
+          <div class="detail-card">
+            <span class="detail-card__label" title="زمان طلوع خورشید">طلوع آفتاب</span>
+            <span class="detail-card__value" id="detail-sunrise">--:--</span>
+          </div>
+          <div class="detail-card">
+            <span class="detail-card__label" title="زمان غروب خورشید">غروب آفتاب</span>
+            <span class="detail-card__value" id="detail-sunset">--:--</span>
+          </div>
+        </section>
+
+        <!-- Hourly + daily forecasts (side by side on desktop, stacked below) -->
+        <div class="forecast-row">
+          <section class="panel fade-in" aria-label="پیش‌بینی ساعتی">
+            <h2 class="panel__title">پیش‌بینی ۲۴ ساعت آینده</h2>
+            <p class="chart-caption" id="hourly-chart-caption"></p>
+            <ul class="hourly-list" id="hourly-list" aria-label="فهرست ساعتی"></ul>
+          </section>
+
+          <section class="panel fade-in" aria-label="پیش‌بینی هفتگی">
+            <h2 class="panel__title">پیش‌بینی ۷ روز آینده</h2>
+            <p class="chart-caption" id="daily-chart-caption"></p>
+            <ul class="daily-list" id="daily-list"></ul>
+          </section>
+        </div>
+
+        <!-- Important info, right under the weekly forecast -->
+        <section class="weekly-insights fade-in" aria-label="نکات مهم هفته">
+          <div class="insight-card">
+            <p class="best-day-callout" id="best-day-callout"></p>
+            <p class="weekly-precip" id="weekly-precip"></p>
+            <p class="chart-caption chart-caption--rain" id="today-rain-window"></p>
+          </div>
+        </section>
+      </section>
+
+      <!-- Hottest / coldest city across Iran's provincial capitals -->
+      <section class="extremes fade-in state-panel--hidden" id="extremes" aria-label="گرم‌ترین و سردترین شهر کشور">
+        <h2 class="extremes__title">گرم‌ترین و سردترین شهر کشور همین الان</h2>
+        <div class="extremes__grid">
+          <div class="extreme-card extreme-card--hot" id="extreme-hot">
+            <span class="extreme-card__icon" aria-hidden="true">🔥</span>
+            <span class="extreme-card__label">گرم‌ترین شهر</span>
+            <span class="extreme-card__city" id="extreme-hot-city">--</span>
+            <span class="extreme-card__temp" id="extreme-hot-temp">--°</span>
+          </div>
+          <div class="extreme-card extreme-card--cold" id="extreme-cold">
+            <span class="extreme-card__icon" aria-hidden="true">❄️</span>
+            <span class="extreme-card__label">سردترین شهر</span>
+            <span class="extreme-card__city" id="extreme-cold-city">--</span>
+            <span class="extreme-card__temp" id="extreme-cold-temp">--°</span>
+          </div>
+        </div>
+
+        <h3 class="heatmap__title">نقشه‌ی حرارتی کشور</h3>
+        <div class="heatmap" id="heatmap" aria-label="دمای لحظه‌ای مراکز استان‌ها"></div>
+        <p class="heatmap__analysis" id="heatmap-analysis"></p>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <p>
+        منبع داده: <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer">Open-Meteo</a>
+      </p>
+    </footer>
+  </div>
+
+  <script type="module" src="/app.js?v=03902c7d"></script>
+</body>
+</html>

@@ -7,98 +7,17 @@ import { classifyAqi } from "./aqi.js";
 import { mascotSvg } from "./mascot.js";
 import { heatColor } from "./heatColor.js";
 import { windCompassSvg } from "./windCompass.js";
-
-interface CurrentWeather {
-  temperature: number;
-  apparentTemperature: number;
-  weatherCode: number;
-  isDay: boolean;
-  humidity: number;
-  windSpeed: number;
-  windDirection: number;
-  pressure: number;
-  uvIndex: number;
-  visibility: number;
-  time: string;
-}
-
-interface HourlyEntry {
-  time: string;
-  temperature: number;
-  weatherCode: number;
-  precipitationProbability: number;
-  precipitation: number;
-  isDay: boolean;
-}
-
-interface DailyEntry {
-  date: string;
-  weatherCode: number;
-  temperatureMax: number;
-  temperatureMin: number;
-  precipitationProbability: number;
-  precipitationSum: number;
-  sunrise: string;
-  sunset: string;
-  uvIndexMax: number;
-  windSpeedMax: number;
-}
-
-interface AirQuality {
-  usAqi: number | null;
-  pm2_5: number | null;
-  pm10: number | null;
-  category: string;
-}
-
-interface ClimateComparison {
-  avgMax: number;
-  avgMin: number;
-  diffFromAvgMax: number;
-  yearsUsed: number;
-}
-
-interface WeatherResponse {
-  location: {
-    name: string;
-    region?: string;
-    country: string;
-    timezone: string;
-  };
-  current: CurrentWeather;
-  hourly: HourlyEntry[];
-  daily: DailyEntry[];
-  airQuality: AirQuality | null;
-  climateComparison: ClimateComparison | null;
-  fetchedAt: string;
-}
-
-interface GeocodeSuggestion {
-  name: string;
-  admin1?: string;
-  country: string;
-  latitude: number;
-  longitude: number;
-  timezone: string;
-}
-
-interface ApiErrorBody {
-  error: string;
-  message: string;
-}
-
-interface CityExtreme {
-  name: string;
-  temperature: number;
-  weatherCode: number;
-}
-
-interface HighlightsResponse {
-  hottest: CityExtreme | null;
-  coldest: CityExtreme | null;
-  cities: CityExtreme[];
-  updatedAt: string;
-}
+import { pruneExpiredCache } from "./cache.js";
+import { getHighlights, getSuggestions, getWeatherByCity, getWeatherByLocation } from "./api.js";
+import type {
+  AirQuality,
+  ClimateComparison,
+  CityExtreme,
+  DailyEntry,
+  GeocodeSuggestion,
+  HourlyEntry,
+  WeatherResponse,
+} from "./types.js";
 
 const DEFAULT_CITY = "تبریز";
 const WINDY_THRESHOLD_KMH = 35;
@@ -507,22 +426,15 @@ function setActiveCityCard(city: string): void {
   });
 }
 
-async function runWeatherFetch(url: string, activeCityForCards: string): Promise<void> {
+async function runWeatherFetch(load: () => Promise<WeatherResponse>, activeCityForCards: string): Promise<void> {
   showState("loading");
   els.status.textContent = "در حال جست‌وجو…";
   setActiveCityCard(activeCityForCards);
 
   try {
-    const response = await fetch(url);
-    const body = await response.json();
-
-    if (!response.ok) {
-      const errorBody = body as ApiErrorBody;
-      throw new Error(errorBody.message || "خطای ناشناخته رخ داد.");
-    }
-
-    renderWeather(body as WeatherResponse);
-    els.status.textContent = `اطلاعات آب‌وهوای ${(body as WeatherResponse).location.name} نمایش داده شد.`;
+    const data = await load();
+    renderWeather(data);
+    els.status.textContent = `اطلاعات آب‌وهوای ${data.location.name} نمایش داده شد.`;
   } catch (err) {
     const message = err instanceof Error ? err.message : "خطای ناشناخته رخ داد.";
     els.errorMessage.textContent = message;
@@ -532,19 +444,11 @@ async function runWeatherFetch(url: string, activeCityForCards: string): Promise
 }
 
 function fetchWeather(city: string): Promise<void> {
-  return runWeatherFetch(`/api/weather?city=${encodeURIComponent(city)}`, city);
+  return runWeatherFetch(() => getWeatherByCity(city), city);
 }
 
 function fetchWeatherByLocation(loc: GeocodeSuggestion): Promise<void> {
-  const params = new URLSearchParams({
-    lat: String(loc.latitude),
-    lon: String(loc.longitude),
-    name: loc.name,
-    country: loc.country,
-    timezone: loc.timezone,
-  });
-  if (loc.admin1) params.set("region", loc.admin1);
-  return runWeatherFetch(`/api/weather?${params.toString()}`, loc.name);
+  return runWeatherFetch(() => getWeatherByLocation(loc), loc.name);
 }
 
 function renderQuickCities(): void {
@@ -600,9 +504,8 @@ function renderHeatmap(cities: CityExtreme[]): void {
 
 async function loadHighlights(): Promise<void> {
   try {
-    const response = await fetch("/api/highlights");
-    if (!response.ok) return;
-    const data = (await response.json()) as HighlightsResponse;
+    const data = await getHighlights();
+    if (!data) return;
 
     if (data.hottest) {
       els.extremeHotCity.textContent = data.hottest.name;
@@ -670,9 +573,7 @@ async function fetchSuggestions(query: string): Promise<void> {
   }
 
   try {
-    const response = await fetch(`/api/geocode?query=${encodeURIComponent(query)}`);
-    if (!response.ok) return;
-    const items = (await response.json()) as GeocodeSuggestion[];
+    const items = await getSuggestions(query);
     renderSuggestions(items);
   } catch {
     // Non-critical; leave the dropdown as-is.
@@ -758,6 +659,7 @@ els.quickCitiesToggle.addEventListener("click", () => {
 /* ---------- Init ---------- */
 
 initTheme();
+pruneExpiredCache();
 renderQuickCities();
 els.input.value = DEFAULT_CITY;
 fetchWeather(DEFAULT_CITY);
