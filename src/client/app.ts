@@ -68,6 +68,10 @@ const els = {
 
   detailHumidity: document.getElementById("detail-humidity") as HTMLElement,
   detailWind: document.getElementById("detail-wind") as HTMLElement,
+  detailHumidityHint: document.getElementById("detail-humidity-hint") as HTMLElement,
+  detailWindHint: document.getElementById("detail-wind-hint") as HTMLElement,
+  humidityWater: document.getElementById("humidity-water") as unknown as SVGGElement,
+  windVisual: document.getElementById("wind-visual") as HTMLElement,
   detailWindDirection: document.getElementById("detail-wind-direction") as HTMLElement,
   detailWindCompass: document.getElementById("detail-wind-compass") as HTMLElement,
   detailPressure: document.getElementById("detail-pressure") as HTMLElement,
@@ -284,12 +288,35 @@ function renderBestDay(daily: DailyEntry[]): void {
     `(${Math.round(best.temperatureMax)}°، احتمال بارش ${best.precipitationProbability}٪)`;
 }
 
+function humidityLabel(humidity: number): string {
+  if (humidity < 30) return "هوای خشک";
+  if (humidity < 60) return "رطوبت مطبوع";
+  if (humidity < 80) return "هوای مرطوب";
+  return "خیلی مرطوب";
+}
+
+function windLabel(speedKmh: number): string {
+  if (speedKmh < 6) return "هوای آرام";
+  if (speedKmh < 20) return "نسیم ملایم";
+  if (speedKmh < 40) return "باد متوسط";
+  if (speedKmh < 60) return "باد شدید";
+  return "باد بسیار شدید";
+}
+
 function renderDetails(data: WeatherResponse): void {
   const { current, daily } = data;
   const today = daily[0];
 
   els.detailHumidity.textContent = `${current.humidity}٪`;
+  els.detailHumidityHint.textContent = humidityLabel(current.humidity);
+  // Droplet spans y=3..46 in its viewBox; lift the water surface to the humidity level.
+  const waterTop = 46 - (Math.min(100, Math.max(0, current.humidity)) / 100) * 43;
+  els.humidityWater.style.transform = `translateY(${waterTop.toFixed(1)}px)`;
   els.detailWind.textContent = `${Math.round(current.windSpeed)} کیلومتر/ساعت`;
+  els.detailWindHint.textContent = windLabel(current.windSpeed);
+  // Faster wind => faster streaks (calm ≈ 3.2s per loop, storm ≈ 0.5s).
+  const windDuration = Math.min(3.2, Math.max(0.5, 3.2 - current.windSpeed * 0.045));
+  els.windVisual.style.setProperty("--wind-dur", `${windDuration.toFixed(2)}s`);
   els.detailWindDirection.textContent = windDirectionLabel(current.windDirection);
   els.detailWindCompass.innerHTML = windCompassSvg(current.windDirection);
   els.detailPressure.textContent = `${Math.round(current.pressure)} هکتوپاسکال`;

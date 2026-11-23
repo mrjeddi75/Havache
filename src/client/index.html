@@ -143,13 +143,45 @@
 
         <!-- Details grid -->
         <section class="details-grid fade-in" aria-label="جزئیات آب‌وهوا">
-          <div class="detail-card">
-            <span class="detail-card__label" title="میزان رطوبت هوا">رطوبت</span>
-            <span class="detail-card__value" id="detail-humidity">--٪</span>
+          <div class="detail-card detail-card--visual">
+            <span class="detail-visual" aria-hidden="true">
+              <svg viewBox="0 0 40 52" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <clipPath id="humidity-drop-clip">
+                    <path d="M20 3C20 3 5 22 5 33a15 15 0 0 0 30 0C35 22 20 3 20 3z"/>
+                  </clipPath>
+                </defs>
+                <g clip-path="url(#humidity-drop-clip)">
+                  <g class="humidity-water" id="humidity-water">
+                    <g class="humidity-wave">
+                      <path d="M0 0q10-4 20 0t20 0t20 0t20 0t20 0t20 0V60H0z" fill="currentColor" opacity="0.85"/>
+                    </g>
+                  </g>
+                  <circle class="humidity-bubble" cx="16" cy="44" r="1.8" fill="#fff" opacity="0"/>
+                  <circle class="humidity-bubble" cx="25" cy="46" r="1.4" fill="#fff" opacity="0"/>
+                </g>
+                <path d="M20 3C20 3 5 22 5 33a15 15 0 0 0 30 0C35 22 20 3 20 3z" fill="none" stroke="currentColor" stroke-width="2" opacity="0.55"/>
+              </svg>
+            </span>
+            <div class="detail-card__text">
+              <span class="detail-card__label" title="میزان رطوبت هوا">رطوبت</span>
+              <span class="detail-card__value" id="detail-humidity">--٪</span>
+              <span class="detail-card__hint" id="detail-humidity-hint"></span>
+            </div>
           </div>
-          <div class="detail-card">
-            <span class="detail-card__label" title="سرعت وزش باد">سرعت باد</span>
-            <span class="detail-card__value" id="detail-wind">-- کیلومتر/ساعت</span>
+          <div class="detail-card detail-card--visual">
+            <span class="detail-visual wind-visual" id="wind-visual" aria-hidden="true">
+              <svg viewBox="0 0 40 52" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+                <path class="wind-streak" d="M3 16h22a6 6 0 1 0-6-6"/>
+                <path class="wind-streak" d="M3 28h30a6 6 0 1 1-6 6"/>
+                <path class="wind-streak" d="M3 40h17a5 5 0 1 0-5-5"/>
+              </svg>
+            </span>
+            <div class="detail-card__text">
+              <span class="detail-card__label" title="سرعت وزش باد">سرعت باد</span>
+              <span class="detail-card__value" id="detail-wind">-- کیلومتر/ساعت</span>
+              <span class="detail-card__hint" id="detail-wind-hint"></span>
+            </div>
           </div>
           <div class="detail-card detail-card--compass">
             <span class="detail-card__label" title="جهتی که باد از آن می‌وزد">جهت باد</span>
@@ -182,7 +214,7 @@
 
         <!-- Hourly + daily forecasts (side by side on desktop, stacked below) -->
         <div class="forecast-row">
-          <section class="panel fade-in" aria-label="پیش‌بینی ساعتی">
+          <section class="panel panel--hourly fade-in" aria-label="پیش‌بینی ساعتی">
             <h2 class="panel__title">پیش‌بینی ۲۴ ساعت آینده</h2>
             <p class="chart-caption" id="hourly-chart-caption"></p>
             <ul class="hourly-list" id="hourly-list" aria-label="فهرست ساعتی"></ul>
@@ -232,6 +264,9 @@
     <footer class="app-footer">
       <p>
         منبع داده: <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer">Open-Meteo</a>
+      </p>
+      <p class="app-footer__credit">
+        طراحی با <span class="app-footer__heart" aria-label="عشق">❤</span> برای استفاده شخصی — محمدرضا جدی
       </p>
     </footer>
   </div>

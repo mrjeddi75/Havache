@@ -1,14 +1,17 @@
 :root {
-  --color-sky-top: #f3f7fc;
-  --color-sky-bottom: #ffffff;
-  --color-primary: #1e6fd9;
-  --color-primary-deep: #0b3d75;
+  /* Soft off-white page + cards (no pure #fff), slate text — easier on the eyes */
+  --color-sky-top: #e8eef6;
+  --color-sky-bottom: #eff3f8;
+  --color-primary: #2268d4;
+  --color-primary-deep: #16355c;
+  --color-button: #2268d4;
+  --color-button-hover: #1a56b5;
   --color-accent: #f5a623;
-  --color-text: #2b2f38;
-  --color-text-muted: #6b7480;
-  --color-border: #e6ecf3;
-  --color-surface: #ffffff;
-  --color-surface-alt: #f7f9fc;
+  --color-text: #1e293b;
+  --color-text-muted: #64748b;
+  --color-border: #dfe6ef;
+  --color-surface: #fafbfd;
+  --color-surface-alt: #f0f4f9;
   --radius-md: 14px;
   --radius-lg: 20px;
   --space-1: 4px;
@@ -38,16 +41,19 @@
 }
 
 :root[data-theme="dark"] {
-  --color-sky-top: #0f1720;
-  --color-sky-bottom: #0a0f16;
-  --color-primary: #4a9be8;
-  --color-primary-deep: #eaf4ff;
-  --color-accent: #f5a623;
-  --color-text: #e6edf5;
-  --color-text-muted: #93a0b3;
-  --color-border: #222c39;
-  --color-surface: #151d28;
-  --color-surface-alt: #1b2531;
+  /* Calm navy-slate dark theme: no glaring whites, softened headings */
+  --color-sky-top: #0e1526;
+  --color-sky-bottom: #0b101d;
+  --color-primary: #5b9df0;
+  --color-primary-deep: #cfdcf0;
+  --color-button: #2c66c4;
+  --color-button-hover: #3774d6;
+  --color-accent: #f0a63a;
+  --color-text: #d9e1ee;
+  --color-text-muted: #8c99ae;
+  --color-border: #232f47;
+  --color-surface: #131c2f;
+  --color-surface-alt: #1a2540;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 18px rgba(0, 0, 0, 0.35);
   --shadow-card-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 10px rgba(0, 0, 0, 0.3);
@@ -285,8 +291,8 @@ body {
   padding: 0 18px;
   border: none;
   border-radius: var(--radius-md);
-  background: var(--color-primary);
-  color: #fff;
+  background: var(--color-button);
+  color: #f4f7fb;
   font-family: inherit;
   font-size: 0.95rem;
   font-weight: 600;
@@ -302,7 +308,7 @@ body {
 }
 
 .search__button:hover {
-  background: var(--color-primary-deep);
+  background: var(--color-button-hover);
 }
 
 .search__button:focus-visible {
@@ -559,6 +565,34 @@ body {
   font-size: 0.85rem;
   display: inline-block;
   width: fit-content;
+}
+
+/* Dark theme: deeper gradients so the hero isn't the brightest thing on the page */
+:root[data-theme="dark"] .hero {
+  background: linear-gradient(135deg, #1d4a8a 0%, #2b5f9e 100%);
+  color: #e8eef8;
+}
+:root[data-theme="dark"] .hero--sunny {
+  background: linear-gradient(135deg, #9a6a26 0%, #2b5a96 100%);
+}
+:root[data-theme="dark"] .hero--cloudy,
+:root[data-theme="dark"] .hero--fog {
+  background: linear-gradient(135deg, #46526a 0%, #365272 100%);
+}
+:root[data-theme="dark"] .hero--rain {
+  background: linear-gradient(135deg, #1d4a8a 0%, #14305a 100%);
+}
+:root[data-theme="dark"] .hero--snow {
+  background: linear-gradient(135deg, #357a94 0%, #22497f 100%);
+}
+:root[data-theme="dark"] .hero--storm {
+  background: linear-gradient(135deg, #3f3778 0%, #181433 100%);
+}
+:root[data-theme="dark"] .hero__tip {
+  background: rgba(255, 255, 255, 0.12);
+}
+:root[data-theme="dark"] .hero__outlook {
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .hero__outlook {
@@ -841,6 +875,112 @@ body {
   color: var(--color-primary-deep);
 }
 
+.detail-card--visual {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.detail-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.detail-card__hint {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.detail-card__hint:empty {
+  display: none;
+}
+
+.detail-visual {
+  width: 44px;
+  height: 52px;
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
+
+.detail-visual svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+/* Humidity: a droplet that fills to the humidity %, with a gently moving water surface */
+.humidity-water {
+  transition: transform 1s ease;
+  transform: translateY(46px);
+}
+
+.humidity-wave {
+  animation: humidityWave 2.6s linear infinite;
+}
+
+@keyframes humidityWave {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-40px);
+  }
+}
+
+.humidity-bubble {
+  animation: humidityBubble 3.2s ease-in infinite;
+  opacity: 0;
+}
+
+.humidity-bubble:nth-of-type(2) {
+  animation-delay: 1.4s;
+}
+
+@keyframes humidityBubble {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(-14px);
+    opacity: 0;
+  }
+}
+
+/* Wind: streaks flowing along curved lines; --wind-dur (set from the real
+   wind speed in app.ts) makes stronger wind visibly faster */
+.wind-visual {
+  --wind-dur: 2.2s;
+}
+
+.wind-streak {
+  stroke-dasharray: 14 34;
+  animation: windFlow var(--wind-dur) linear infinite;
+}
+
+.wind-streak:nth-of-type(2) {
+  animation-delay: calc(var(--wind-dur) * -0.35);
+}
+
+.wind-streak:nth-of-type(3) {
+  animation-delay: calc(var(--wind-dur) * -0.7);
+}
+
+@keyframes windFlow {
+  from {
+    stroke-dashoffset: 48;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
 .detail-card__compass-row {
   display: flex;
   align-items: center;
@@ -881,9 +1021,31 @@ body {
   min-width: 0;
 }
 
+/* Desktop: both cards share one height (the weekly card sets it) and the
+   hourly list fills the remaining space with its own scroll, so the two
+   cards line up exactly. contain:size stops the 24 hourly rows from
+   stretching the row; older browsers fall back to the capped list. */
 @media (min-width: 1024px) {
   .forecast-row {
     grid-template-columns: 1fr 1fr;
+  }
+
+  @supports (contain: size) {
+    .forecast-row {
+      align-items: stretch;
+    }
+
+    .panel--hourly {
+      contain: size;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel--hourly .hourly-list {
+      flex: 1 1 0;
+      min-height: 0;
+      max-height: none;
+    }
   }
 }
 
@@ -925,7 +1087,8 @@ body {
   grid-template-columns: 5px 64px 40px 1fr auto;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-2);
+  padding: 12px var(--space-2);
+  min-height: 58px;
   border-bottom: 1px solid var(--color-border);
   border-radius: 6px;
   transition: background-color 0.12s ease;
@@ -1002,7 +1165,8 @@ body {
   grid-template-columns: 5px 110px 40px 1fr auto;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-2);
+  padding: 12px var(--space-2);
+  min-height: 58px;
   border-bottom: 1px solid var(--color-border);
   border-radius: 6px;
   transition: background-color 0.12s ease;
@@ -1226,6 +1390,14 @@ body {
   color: var(--color-text-muted);
   font-size: 0.85rem;
   padding-top: var(--space-3);
+}
+
+.app-footer__credit {
+  margin: var(--space-1) 0 0;
+}
+
+.app-footer__heart {
+  color: #e5484d;
 }
 
 .app-footer a {
@@ -1489,7 +1661,10 @@ body {
   .drop,
   .flake,
   .bolt,
-  .wind-line {
+  .wind-line,
+  .humidity-wave,
+  .humidity-bubble,
+  .wind-streak {
     animation: none !important;
     scroll-behavior: auto !important;
   }
@@ -1501,11 +1676,29 @@ body {
     --color-text-muted: #333;
   }
 
-  .hero {
-    background: var(--color-primary-deep);
+  .hero,
+  :root[data-theme="dark"] .hero {
+    background: #0f2a4d;
   }
 
   .daily-row {
     background: var(--color-surface) !important;
+  }
+}
+
+/* Compact visual detail cards (humidity / wind) on phones */
+@media (max-width: 480px) {
+  .detail-card--visual {
+    gap: var(--space-2);
+    padding: 12px;
+  }
+
+  .detail-visual {
+    width: 32px;
+    height: 40px;
+  }
+
+  .detail-card--visual .detail-card__value {
+    font-size: 1rem;
   }
 }
